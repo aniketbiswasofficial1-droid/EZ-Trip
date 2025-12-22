@@ -566,7 +566,21 @@ const TripDetail = () => {
 
         {/* Add Expense Button */}
         <div className="mb-8">
-          <Dialog open={addExpenseOpen} onOpenChange={setAddExpenseOpen}>
+          <Dialog open={addExpenseOpen} onOpenChange={(open) => {
+            setAddExpenseOpen(open);
+            if (open && trip) {
+              // Initialize with all members selected for split
+              const defaultSplits = trip.members.map(m => ({ user_id: m.user_id, amount: 0 }));
+              setNewExpense({
+                description: "",
+                total_amount: "",
+                currency: trip.currency || "USD",
+                category: "general",
+                payers: [],
+                splits: defaultSplits,
+              });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button
                 className="w-full sm:w-auto rounded-full font-bold tracking-wide btn-glow"
@@ -583,7 +597,7 @@ const TripDetail = () => {
                 </DialogTitle>
               </DialogHeader>
               <ScrollArea className="flex-1 pr-4">
-                <form onSubmit={handleCreateExpense} className="space-y-6 pt-4">
+                <form onSubmit={handleCreateExpense} className="space-y-6 pt-4 pb-4">
                   {/* Description */}
                   <div className="space-y-2">
                     <Label htmlFor="expense-description">Description</Label>
