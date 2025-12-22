@@ -73,6 +73,7 @@ const TripPlanner = () => {
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
   
   // Form state
   const [destination, setDestination] = useState("");
@@ -96,21 +97,27 @@ const TripPlanner = () => {
   };
 
   const handleGeneratePlan = async () => {
+    const newErrors = {};
+    
     if (!destination.trim()) {
-      toast.error("Please enter a destination");
-      return;
+      newErrors.destination = "Please enter a destination";
     }
 
     if (!dateRange.from || !dateRange.to) {
-      toast.error("Please select travel dates");
-      return;
+      newErrors.dates = "Please select travel dates";
     }
 
     if (includeFlights && !departureCity.trim()) {
-      toast.error("Please enter your departure city");
-      return;
+      newErrors.departureCity = "Please enter your departure city";
     }
 
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      toast.error(Object.values(newErrors)[0]);
+      return;
+    }
+    
+    setErrors({});
     setLoading(true);
     setPlan(null);
 
