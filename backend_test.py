@@ -542,8 +542,14 @@ class SplitEaseAPITester:
             # Test refund operations
             self.test_refund_operations(expense_id)
             
+            # Test AI Trip Planner endpoints
+            plan_id = self.test_ai_trip_planner_endpoints()
+            
             # Cleanup
             self.cleanup_test_data()
+        
+        # Test weather API integration (no auth needed)
+        self.test_weather_api_integration()
         
         # Print summary
         print(f"\n📊 Test Summary:")
