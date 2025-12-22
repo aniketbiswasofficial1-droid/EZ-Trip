@@ -71,6 +71,7 @@ const TripDetail = () => {
 
   // Dialogs
   const [addExpenseOpen, setAddExpenseOpen] = useState(false);
+  const [editExpenseOpen, setEditExpenseOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [addRefundOpen, setAddRefundOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -84,6 +85,10 @@ const TripDetail = () => {
     payers: [],
     splits: [],
   });
+  
+  // Multiple payers mode
+  const [multiplePayersMode, setMultiplePayersMode] = useState(false);
+  const [singlePayer, setSinglePayer] = useState("");
 
   // New member form
   const [newMember, setNewMember] = useState({ email: "", name: "" });
