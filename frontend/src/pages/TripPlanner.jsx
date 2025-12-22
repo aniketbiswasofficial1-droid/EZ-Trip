@@ -640,6 +640,83 @@ const TripPlanner = () => {
                     </ScrollArea>
                   </TabsContent>
 
+                  {/* Price Comparison Tab */}
+                  <TabsContent value="prices">
+                    <div className="space-y-4">
+                      <div className="bg-card border border-border rounded-xl p-6">
+                        <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
+                          <DollarSign className="w-5 h-5 text-primary" />
+                          Price Comparison Across Platforms
+                        </h4>
+                        <p className="text-sm text-muted-foreground mb-6">
+                          Compare prices from multiple booking platforms to find the best deals
+                        </p>
+                        
+                        {plan.cost_breakdown.price_comparisons && plan.cost_breakdown.price_comparisons.length > 0 ? (
+                          <div className="space-y-6">
+                            {plan.cost_breakdown.price_comparisons.map((comparison, idx) => (
+                              <div key={idx} className="p-4 bg-secondary/30 rounded-xl">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div>
+                                    <h5 className="font-bold capitalize">{comparison.category}</h5>
+                                    <p className="text-sm text-muted-foreground">{comparison.item_name}</p>
+                                  </div>
+                                  {comparison.savings_potential > 0 && (
+                                    <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm font-medium">
+                                      Save up to {getCurrencySymbol(plan.cost_breakdown.currency)}{comparison.savings_potential}
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                <div className="grid gap-2">
+                                  {comparison.prices.map((price, pidx) => {
+                                    const isBestDeal = comparison.best_deal?.platform === price.platform;
+                                    return (
+                                      <div 
+                                        key={pidx}
+                                        className={`flex items-center justify-between p-3 rounded-lg ${
+                                          isBestDeal ? 'bg-primary/10 border border-primary/30' : 'bg-background'
+                                        }`}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          {isBestDeal && (
+                                            <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                                              Best Deal
+                                            </span>
+                                          )}
+                                          <span className="font-medium">{price.platform}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                          <span className={`font-heading text-lg font-bold ${isBestDeal ? 'text-primary' : ''}`}>
+                                            {getCurrencySymbol(plan.cost_breakdown.currency)}{price.price}
+                                          </span>
+                                          {price.url && (
+                                            <a 
+                                              href={price.url} 
+                                              target="_blank" 
+                                              rel="noopener noreferrer"
+                                              className="text-xs text-muted-foreground hover:text-primary"
+                                            >
+                                              Visit →
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-8">
+                            Price comparison data will be included in your next trip plan
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+
                   {/* Tips Tab */}
                   <TabsContent value="tips">
                     <div className="bg-card border border-border rounded-xl p-6">
