@@ -261,16 +261,27 @@ class RefundCalculationTester:
             member_data = {"email": "user_b@test.com", "name": "User B"}
             requests.post(f"{self.api_url}/trips/{trip_id}/members", json=member_data, headers=headers, timeout=10)
             
+            # Get actual trip member IDs
+            response = requests.get(f"{self.api_url}/trips/{trip_id}", headers=headers, timeout=10)
+            if response.status_code != 200:
+                self.log_test("Scenario 2: Get Trip", False, f"Status: {response.status_code}")
+                return
+            
+            trip = response.json()
+            trip_members = trip['members']
+            actual_user_a = trip_members[0]['user_id']  # Creator
+            actual_user_b = trip_members[1]['user_id'] if len(trip_members) > 1 else user_b_id
+            
             # Create expense: A pays 3000, split equally between A and B
             expense_data = {
                 "trip_id": trip_id,
                 "description": "Test Expense - A pays 3000",
                 "total_amount": 3000.00,
                 "currency": "USD",
-                "payers": [{"user_id": user_a_id, "amount": 3000.00}],
+                "payers": [{"user_id": actual_user_a, "amount": 3000.00}],
                 "splits": [
-                    {"user_id": user_a_id, "amount": 1500.00},
-                    {"user_id": user_b_id, "amount": 1500.00}
+                    {"user_id": actual_user_a, "amount": 1500.00},
+                    {"user_id": actual_user_b, "amount": 1500.00}
                 ]
             }
             
@@ -286,7 +297,7 @@ class RefundCalculationTester:
                 "expense_id": expense_id,
                 "amount": 1000.00,
                 "reason": "Refund to A",
-                "refunded_to": [user_a_id]
+                "refunded_to": [actual_user_a]
             }
             
             response = requests.post(f"{self.api_url}/refunds", json=refund_data, headers=headers, timeout=10)
@@ -303,8 +314,8 @@ class RefundCalculationTester:
             balances = response.json()
             balance_dict = {b['user_id']: b['balance'] for b in balances}
             
-            a_balance = balance_dict.get(user_a_id, 0)
-            b_balance = balance_dict.get(user_b_id, 0)
+            a_balance = balance_dict.get(actual_user_a, 0)
+            b_balance = balance_dict.get(actual_user_b, 0)
             total_balance = sum(balance_dict.values())
             
             # Expected: A +1000, B -1000, Total: 0
