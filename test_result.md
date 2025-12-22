@@ -102,17 +102,20 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Refund amount is not being subtracted from the total expense before splitting among members, leading to incorrect balance calculations"
+user_problem_statement: "Refund amount is not being subtracted from the total expense before splitting among members, and refund recipient is not considered in balance calculation. Also, 'Your balance' section is not updating in real-time."
 
 backend:
-  - task: "Refund calculation in balance logic"
+  - task: "Refund calculation with recipient consideration"
     implemented: true
     working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
+        - working: true
+          agent: "main"
+          comment: "FIXED: Updated refund calculation to consider WHO receives the refund. Person who receives refund is treated as having negative payment (debit). Updated get_trip_balances(), get_trips(), and get_trip() endpoints. Logic: 1) Add what each person paid, 2) Subtract refunds from recipients (as negative payment), 3) Calculate splits based on net amount. Tested calculation: 3000 expense, 1500 refund to Ritaban → Aniket +2250, Ritaban -2250 (correct!)."
         - working: true
           agent: "main"
           comment: "Fixed refund calculation logic in get_trip_balances(), get_trips(), and get_trip() endpoints. The logic now calculates net expense (total - refunds) and recalculates splits proportionally based on original split ratios. Tested with curl on two different trips and calculations are correct."
@@ -122,9 +125,12 @@ backend:
         - working: true
           agent: "testing"
           comment: "COMPREHENSIVE TESTING COMPLETED: All refund calculation tests PASSED. Tested both provided scenarios: (1) GOA trip with 3000 INR expense and 1500 INR refund showing correct 1500 INR net amount, (2) Test trip with 500 expense and 50 refund showing correct 450 net amount. All API endpoints working correctly: GET /api/trips shows correct total_expenses after refunds, GET /api/trips/{id} shows correct values, GET /api/trips/{id}/balances shows properly calculated member balances, GET /api/expenses/trip/{id} shows correct net_amount field. Edge cases tested: expenses with no refunds work normally, multiple refunds sum correctly, all balances remain mathematically balanced. Fix is working perfectly."
+        - working: "NA"
+          agent: "user"
+          comment: "User clarified: WHO receives the refund matters! If B receives 100 refund, B should owe MORE. If A receives it, B should owe LESS. Example: B owed A 1000, with 100 refund to B → B should owe 1050. Refund to A → B should owe 950."
 
 frontend:
-  - task: "Display updated balances with refunds"
+  - task: "Real-time balance updates after refund operations"
     implemented: true
     working: "NA"
     file: "/app/frontend/src/pages/TripDetail.jsx"
@@ -134,7 +140,10 @@ frontend:
     status_history:
         - working: "NA"
           agent: "main"
-          comment: "Frontend should automatically display correct balances as it fetches data from the fixed backend endpoints. Need to verify UI displays correctly."
+          comment: "FIXED: Added fetchTrip() call to handleCreateRefund() and handleUpdateRefund() functions. Now after adding or editing a refund, the 'Your balance' section will update in real-time along with expenses, balances, and settlements."
+        - working: "NA"
+          agent: "user"
+          comment: "User reported: The 'Your balance' section is not being updated in real-time after refund operations."
 
 metadata:
   created_by: "main_agent"
