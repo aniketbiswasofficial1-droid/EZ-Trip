@@ -9,6 +9,7 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - Multiple currency support (13+ currencies)
 - Native ad slots that blend with design
 - Dark mode design
+- **AI Trip Planner** with weather, costs, and itinerary generation
 
 ## Architecture
 
@@ -17,12 +18,25 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - **Trip Routes**: CRUD for trips, member management, balances, settlements
 - **Expense Routes**: Create/list/delete expenses with multi-payer and custom splits
 - **Refund Routes**: Create/list/delete refunds linked to expenses
+- **Planner Routes**: `/api/planner/generate`, `/api/planner/save`, `/api/planner/saved`
 - **Currencies**: List of 13 supported currencies
+
+### AI Trip Planner Service
+- **LLM**: OpenAI GPT-4o via Emergent LLM Key
+- **Weather API**: Open-Meteo (free, no API key needed)
+- **Features**:
+  - Day-by-day itinerary with time slots
+  - Weather forecast integration
+  - Cost breakdown (flights, hotels, food, activities)
+  - Per-person and group total estimates
+  - Travel tips, packing suggestions, local customs
+  - Emergency contacts
 
 ### Frontend (React + Tailwind + Shadcn)
 - **Landing Page**: Hero section, features, Google OAuth login
-- **Dashboard**: Trip list, balance overview, create trip modal
+- **Dashboard**: Trip list, balance overview, AI Planner card, create trip modal
 - **Trip Detail**: Expenses tab, balances tab, settlements tab
+- **AI Trip Planner**: Full planning interface with preferences and results
 - **Modals**: Add expense, add refund, add member
 
 ### Database Collections
@@ -31,6 +45,8 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - `trips`: Trip details with members array
 - `expenses`: Expense records with payers and splits arrays
 - `refunds`: Refund records linked to expenses
+- `saved_plans`: AI-generated trip plans
+- `settings`: App settings including LLM API key
 
 ## Completed Features
 - [x] Google OAuth authentication (Emergent-managed)
@@ -45,17 +61,24 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - [x] Dark mode UI with neon accents
 - [x] Native ad slots (styled like content cards)
 - [x] Responsive design
+- [x] **AI Trip Planner with GPT-4o**
+- [x] **Weather integration (Open-Meteo)**
+- [x] **Cost estimation and breakdown**
+- [x] **Day-by-day itinerary generation**
+- [x] **Save and view trip plans**
+- [x] **Admin LLM key management**
 
 ## Next Action Items
-1. **Currency Conversion**: Add real-time exchange rates for multi-currency trips
-2. **Expense Categories**: Add icons and filtering by category
-3. **Export/Share**: Export trip summary as PDF or share link
-4. **Notifications**: Email notifications for new expenses
-5. **Mobile App**: React Native version for mobile
+1. **Real-time currency conversion**: Add exchange rate API for multi-currency trips
+2. **Export trip plans**: PDF export for itineraries
+3. **Share trip plans**: Shareable links for group planning
+4. **Push notifications**: Notify when expenses are added
 
 ## Tech Stack
 - Frontend: React 19, Tailwind CSS, Shadcn/UI, Framer Motion
 - Backend: FastAPI, Motor (async MongoDB)
 - Database: MongoDB
 - Auth: Emergent-managed Google OAuth
-- Fonts: Syne (headings), Manrope (body)
+- AI: OpenAI GPT-4o via Emergent LLM Key
+- Weather: Open-Meteo API
+- Fonts: Montserrat
