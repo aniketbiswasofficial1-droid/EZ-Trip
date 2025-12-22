@@ -567,26 +567,42 @@ async def get_trip_balances(
         {"_id": 0}
     ).to_list(1000)
     
-    for expense in expenses:
-        for payer in expense.get("payers", []):
-            if payer["user_id"] in balances:
-                balances[payer["user_id"]] += payer["amount"]
-        
-        for split in expense.get("splits", []):
-            if split["user_id"] in balances:
-                balances[split["user_id"]] -= split["amount"]
-    
-    # Account for refunds
-    refunds = await db.refunds.find(
+    # Get all refunds for this trip
+    all_refunds = await db.refunds.find(
         {"trip_id": trip_id},
         {"_id": 0}
     ).to_list(1000)
     
-    for refund in refunds:
-        per_person = refund["amount"] / len(refund["refunded_to"])
-        for uid in refund["refunded_to"]:
-            if uid in balances:
-                balances[uid] += per_person
+    # Group refunds by expense_id
+    refunds_by_expense = {}
+    for refund in all_refunds:
+        expense_id = refund["expense_id"]
+        if expense_id not in refunds_by_expense:
+            refunds_by_expense[expense_id] = []
+        refunds_by_expense[expense_id].append(refund)
+    
+    for expense in expenses:
+        # Calculate net expense amount after refunds
+        expense_id = expense["expense_id"]
+        total_refunded = sum(r["amount"] for r in refunds_by_expense.get(expense_id, []))
+        net_amount = expense["total_amount"] - total_refunded
+        original_amount = expense["total_amount"]
+        
+        # Add what each person paid
+        for payer in expense.get("payers", []):
+            if payer["user_id"] in balances:
+                balances[payer["user_id"]] += payer["amount"]
+        
+        # Recalculate splits based on net amount
+        splits = expense.get("splits", [])
+        if splits and original_amount > 0:
+            # Calculate each person's share based on the net amount
+            for split in splits:
+                if split["user_id"] in balances:
+                    # Calculate the proportional split of the net amount
+                    original_split_ratio = split["amount"] / original_amount
+                    adjusted_split = net_amount * original_split_ratio
+                    balances[split["user_id"]] -= adjusted_split
     
     return [
         BalanceEntry(
