@@ -367,31 +367,49 @@ async def get_trips(user: dict = Depends(get_current_user)):
             {"_id": 0}
         ).to_list(1000)
         
-        total_expenses = sum(e.get("total_amount", 0) for e in expenses)
+        # Get all refunds for this trip
+        all_refunds = await db.refunds.find(
+            {"trip_id": trip["trip_id"]},
+            {"_id": 0}
+        ).to_list(1000)
+        
+        # Group refunds by expense_id
+        refunds_by_expense = {}
+        for refund in all_refunds:
+            expense_id = refund["expense_id"]
+            if expense_id not in refunds_by_expense:
+                refunds_by_expense[expense_id] = []
+            refunds_by_expense[expense_id].append(refund)
+        
+        # Calculate total expenses after refunds
+        total_expenses = 0
+        for e in expenses:
+            total_refunded = sum(r["amount"] for r in refunds_by_expense.get(e["expense_id"], []))
+            total_expenses += (e.get("total_amount", 0) - total_refunded)
         
         # Calculate user balance
         user_balance = 0
         for expense in expenses:
+            # Calculate net expense amount after refunds
+            expense_id = expense["expense_id"]
+            total_refunded = sum(r["amount"] for r in refunds_by_expense.get(expense_id, []))
+            net_amount = expense["total_amount"] - total_refunded
+            original_amount = expense["total_amount"]
+            
             # What user paid
             for payer in expense.get("payers", []):
                 if payer["user_id"] == user["user_id"]:
                     user_balance += payer["amount"]
             
-            # What user owes
-            for split in expense.get("splits", []):
-                if split["user_id"] == user["user_id"]:
-                    user_balance -= split["amount"]
-        
-        # Account for refunds
-        refunds = await db.refunds.find(
-            {"trip_id": trip["trip_id"]},
-            {"_id": 0}
-        ).to_list(1000)
-        
-        for refund in refunds:
-            if user["user_id"] in refund.get("refunded_to", []):
-                per_person = refund["amount"] / len(refund["refunded_to"])
-                user_balance += per_person
+            # What user owes (recalculated based on net amount)
+            splits = expense.get("splits", [])
+            if splits and original_amount > 0:
+                for split in splits:
+                    if split["user_id"] == user["user_id"]:
+                        # Calculate proportional split of net amount
+                        original_split_ratio = split["amount"] / original_amount
+                        adjusted_split = net_amount * original_split_ratio
+                        user_balance -= adjusted_split
         
         if isinstance(trip.get("created_at"), str):
             trip["created_at"] = datetime.fromisoformat(trip["created_at"])
