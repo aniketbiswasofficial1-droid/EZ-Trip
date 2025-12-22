@@ -167,9 +167,9 @@ const TripPlanner = () => {
     }
   };
 
-  const getCurrencySymbol = (currency) => {
-    const symbols = { USD: "$", EUR: "€", GBP: "£", INR: "₹" };
-    return symbols[currency] || currency;
+  const getCurrencySymbol = (curr) => {
+    const symbols = { USD: "$", EUR: "€", GBP: "£", INR: "₹", JPY: "¥", AUD: "A$", SGD: "S$", THB: "฿" };
+    return symbols[curr] || curr;
   };
 
   return (
