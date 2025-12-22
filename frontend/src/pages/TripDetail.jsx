@@ -606,9 +606,7 @@ const TripDetail = () => {
                         step="0.01"
                         placeholder="0.00"
                         value={newExpense.total_amount}
-                        onChange={(e) =>
-                          setNewExpense({ ...newExpense, total_amount: e.target.value })
-                        }
+                        onChange={(e) => handleAmountChange(e.target.value)}
                         data-testid="expense-amount-input"
                       />
                     </div>
