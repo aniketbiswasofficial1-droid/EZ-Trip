@@ -99,6 +99,10 @@ const TripDetail = () => {
     reason: "",
     refunded_to: [],
   });
+  
+  // Edit refund state
+  const [editRefundOpen, setEditRefundOpen] = useState(false);
+  const [selectedRefund, setSelectedRefund] = useState(null);
 
   useEffect(() => {
     fetchTrip();
