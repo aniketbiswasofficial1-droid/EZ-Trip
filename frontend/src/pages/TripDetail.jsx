@@ -482,6 +482,7 @@ const TripDetail = () => {
       setSelectedRefund(null);
       setSelectedExpense(null);
       setNewRefund({ amount: "", reason: "", refunded_to: [] });
+      fetchTrip();
       fetchExpenses();
       fetchBalances();
       fetchSettlements();
