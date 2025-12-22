@@ -590,14 +590,13 @@ const TripDetail = () => {
                 Add Expense
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-              <DialogHeader>
+            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+              <DialogHeader className="sticky top-0 bg-card z-10 pb-4">
                 <DialogTitle className="font-heading text-2xl">
                   Add Expense
                 </DialogTitle>
               </DialogHeader>
-              <ScrollArea className="flex-1 pr-4">
-                <form onSubmit={handleCreateExpense} className="space-y-6 pt-4 pb-4">
+              <form onSubmit={handleCreateExpense} className="space-y-6 pb-4">
                   {/* Description */}
                   <div className="space-y-2">
                     <Label htmlFor="expense-description">Description</Label>
