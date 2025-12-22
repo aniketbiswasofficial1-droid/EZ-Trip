@@ -30,6 +30,7 @@ trips_router = APIRouter(prefix="/trips")
 expenses_router = APIRouter(prefix="/expenses")
 refunds_router = APIRouter(prefix="/refunds")
 planner_router = APIRouter(prefix="/planner")
+admin_router = APIRouter(prefix="/admin")
 
 # Configure logging
 logging.basicConfig(
