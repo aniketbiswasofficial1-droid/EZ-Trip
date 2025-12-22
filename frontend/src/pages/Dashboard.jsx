@@ -191,7 +191,7 @@ const Dashboard = () => {
         </div>
 
         {/* Balance Overview */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 stagger-children">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 stagger-children">
           <div className="bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
             <p className="text-sm text-muted-foreground mb-1">Overall Balance</p>
             <p
@@ -220,11 +220,27 @@ const Dashboard = () => {
             </p>
           </div>
 
-          <div className="sm:col-span-2 lg:col-span-1 bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
+          {/* AI Trip Planner Card */}
+          <div 
+            onClick={() => navigate("/planner")}
+            className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 rounded-xl p-6 animate-fade-in opacity-0 cursor-pointer card-hover"
+            data-testid="ai-planner-card"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <p className="text-sm font-medium text-primary">AI Powered</p>
+            </div>
+            <p className="font-heading text-xl font-bold mb-1">Trip Planner</p>
+            <p className="text-sm text-muted-foreground">
+              Get weather, costs & itinerary
+            </p>
+          </div>
+
+          <div className="bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
               <DialogTrigger asChild>
                 <Button
-                  className="w-full h-full min-h-[100px] rounded-xl font-bold tracking-wide btn-glow flex flex-col items-center justify-center gap-2"
+                  className="w-full h-full min-h-[80px] rounded-xl font-bold tracking-wide btn-glow flex flex-col items-center justify-center gap-2"
                   data-testid="create-trip-btn"
                 >
                   <Plus className="w-8 h-8" />
