@@ -961,7 +961,7 @@ api_router.include_router(refunds_router)
 
 @api_router.get("/")
 async def root():
-    return {"message": "SplitEase API"}
+    return {"message": "EZ Trip API"}
 
 app.include_router(api_router)
 

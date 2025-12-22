@@ -128,7 +128,7 @@ const Dashboard = () => {
           <div className="flex items-center gap-2">
             <Wallet className="w-8 h-8 text-primary" />
             <span className="font-heading text-xl font-bold tracking-tight">
-              SplitEase
+              EZ Trip
             </span>
           </div>
 

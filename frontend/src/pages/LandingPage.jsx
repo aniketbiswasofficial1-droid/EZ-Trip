@@ -63,7 +63,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Wallet className="w-8 h-8 text-primary" />
-            <span className="font-heading text-xl font-bold tracking-tight">SplitEase</span>
+            <span className="font-heading text-xl font-bold tracking-tight">EZ Trip</span>
           </div>
           <Button 
             onClick={login}
@@ -239,7 +239,7 @@ const LandingPage = () => {
             Ready to simplify your group expenses?
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of travelers who trust SplitEase for fair and easy expense splitting.
+            Join thousands of travelers who trust EZ Trip for fair and easy expense splitting.
           </p>
           <Button 
             onClick={login}
@@ -258,7 +258,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Wallet className="w-6 h-6 text-primary" />
-            <span className="font-heading font-bold">SplitEase</span>
+            <span className="font-heading font-bold">EZ Trip</span>
           </div>
           <p className="text-sm text-muted-foreground">
             Split expenses, not friendships.

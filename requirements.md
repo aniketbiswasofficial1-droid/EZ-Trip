@@ -1,4 +1,4 @@
-# SplitEase - Trip Expense Splitting App
+# EZ Trip - Trip Expense Splitting App
 
 ## Original Problem Statement
 Create a responsive web-application which is a alternative to Splitwise, where a trip expense is easily calculated. If one or multiple person pays for the whole group or some specific people for a specific expense, can be added. It can also take into account of refunds of a specific bill and can distribute accordingly. It should have Gmail login and people can access it by logging in from their Gmail or account. It should have modern design. If it scales, I should easily be able to integrate ads in it.
