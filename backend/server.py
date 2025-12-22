@@ -29,6 +29,7 @@ auth_router = APIRouter(prefix="/auth")
 trips_router = APIRouter(prefix="/trips")
 expenses_router = APIRouter(prefix="/expenses")
 refunds_router = APIRouter(prefix="/refunds")
+planner_router = APIRouter(prefix="/planner")
 
 # Configure logging
 logging.basicConfig(
