@@ -240,11 +240,17 @@ const TripPlanner = () => {
                     id="destination"
                     placeholder="Paris, France"
                     value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
-                    className="pl-10 h-12"
+                    onChange={(e) => {
+                      setDestination(e.target.value);
+                      if (errors.destination) setErrors({...errors, destination: null});
+                    }}
+                    className={`pl-10 h-12 ${errors.destination ? 'border-destructive' : ''}`}
                     data-testid="destination-input"
                   />
                 </div>
+                {errors.destination && (
+                  <p className="text-sm text-destructive">{errors.destination}</p>
+                )}
               </div>
 
               {/* Date Range */}
@@ -351,10 +357,16 @@ const TripPlanner = () => {
                     <Input
                       placeholder="Departure city (e.g., New York)"
                       value={departureCity}
-                      onChange={(e) => setDepartureCity(e.target.value)}
-                      className="pl-10 h-12"
+                      onChange={(e) => {
+                        setDepartureCity(e.target.value);
+                        if (errors.departureCity) setErrors({...errors, departureCity: null});
+                      }}
+                      className={`pl-10 h-12 ${errors.departureCity ? 'border-destructive' : ''}`}
                       data-testid="departure-city-input"
                     />
+                    {errors.departureCity && (
+                      <p className="text-sm text-destructive mt-1">{errors.departureCity}</p>
+                    )}
                   </div>
                 )}
               </div>
