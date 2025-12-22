@@ -37,6 +37,7 @@ import {
   Globe,
   MapPin,
   Sparkles,
+  Shield,
 } from "lucide-react";
 
 const TRIP_COVERS = [
@@ -53,6 +54,7 @@ const Dashboard = () => {
   const [currencies, setCurrencies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [newTrip, setNewTrip] = useState({
     name: "",
     description: "",
