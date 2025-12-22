@@ -322,8 +322,20 @@ Ensure all costs are realistic for {request.budget_preference} budget level and 
                     tips=day_plan.get("tips", "")
                 ))
             
-            # Build cost breakdown
+            # Build cost breakdown with price comparisons
             cost_data = ai_plan.get("cost_breakdown", {})
+            
+            # Parse price comparisons
+            price_comparisons = []
+            for pc in cost_data.get("price_comparisons", []):
+                price_comparisons.append(PriceComparison(
+                    category=pc.get("category", ""),
+                    item_name=pc.get("item_name", ""),
+                    prices=pc.get("prices", []),
+                    best_deal=pc.get("best_deal", {}),
+                    savings_potential=pc.get("savings_potential", 0)
+                ))
+            
             cost_breakdown = CostBreakdown(
                 flights=cost_data.get("flights", 0),
                 accommodation=cost_data.get("accommodation", 0),
@@ -333,7 +345,8 @@ Ensure all costs are realistic for {request.budget_preference} budget level and 
                 miscellaneous=cost_data.get("miscellaneous", 0),
                 total_per_person=cost_data.get("total_per_person", 0),
                 total_group=cost_data.get("total_group", 0),
-                currency=cost_data.get("currency", "USD")
+                currency=cost_data.get("currency", "USD"),
+                price_comparisons=price_comparisons
             )
             
             return TripPlanResponse(
