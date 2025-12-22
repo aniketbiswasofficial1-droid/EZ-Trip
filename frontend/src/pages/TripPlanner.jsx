@@ -553,9 +553,12 @@ const TripPlanner = () => {
 
                 {/* Tabs for Details */}
                 <Tabs defaultValue="itinerary" className="space-y-4">
-                  <TabsList className="bg-secondary/50 p-1 rounded-full w-full grid grid-cols-4">
+                  <TabsList className="bg-secondary/50 p-1 rounded-full w-full grid grid-cols-5">
                     <TabsTrigger value="itinerary" className="rounded-full text-xs sm:text-sm">
                       Itinerary
+                    </TabsTrigger>
+                    <TabsTrigger value="prices" className="rounded-full text-xs sm:text-sm">
+                      Prices
                     </TabsTrigger>
                     <TabsTrigger value="tips" className="rounded-full text-xs sm:text-sm">
                       Tips
