@@ -77,43 +77,40 @@ class SplitEaseAPITester:
             self.session_token = f"test_session_{timestamp}"
             test_email = f"test.user.{timestamp}@example.com"
             
-            # Create MongoDB commands
-            user_doc = {
-                "user_id": self.test_user_id,
-                "email": test_email,
-                "name": "Test User",
-                "picture": "https://via.placeholder.com/150",
-                "default_currency": "USD",
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            session_doc = {
-                "user_id": self.test_user_id,
-                "session_token": self.session_token,
-                "expires_at": (datetime.now(timezone.utc) + timedelta(days=7)).isoformat(),
-                "created_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            # Insert user
+            # Use mongosh with simpler approach
             import subprocess
-            user_json = json.dumps(user_doc).replace('"', '\\"')
-            user_cmd = f'mongosh --eval "use(\\"test_database\\"); db.users.insertOne({user_json});"'
+            
+            # Create user command
+            user_cmd = f"""mongosh --eval "
+                use('test_database');
+                var userId = '{self.test_user_id}';
+                var sessionToken = '{self.session_token}';
+                db.users.insertOne({{
+                  user_id: userId,
+                  email: '{test_email}',
+                  name: 'Test User',
+                  picture: 'https://via.placeholder.com/150',
+                  default_currency: 'USD',
+                  created_at: new Date()
+                }});
+                db.user_sessions.insertOne({{
+                  user_id: userId,
+                  session_token: sessionToken,
+                  expires_at: new Date(Date.now() + 7*24*60*60*1000),
+                  created_at: new Date()
+                }});
+                print('Created user: ' + userId);
+                print('Session token: ' + sessionToken);
+            " """
+            
             result = subprocess.run(user_cmd, shell=True, capture_output=True, text=True)
             
-            if result.returncode == 0:
-                # Insert session
-                session_json = json.dumps(session_doc).replace('"', '\\"')
-                session_cmd = f'mongosh --eval "use(\\"test_database\\"); db.user_sessions.insertOne({session_json});"'
-                result = subprocess.run(session_cmd, shell=True, capture_output=True, text=True)
-                
-                if result.returncode == 0:
-                    self.log_test("Create Test User & Session", True, f"User ID: {self.test_user_id}")
-                    print(f"📝 Session Token: {self.session_token}")
-                    return True
-                else:
-                    self.log_test("Create Test User & Session", False, f"Session creation failed: {result.stderr}")
+            if result.returncode == 0 and "Created user:" in result.stdout:
+                self.log_test("Create Test User & Session", True, f"User ID: {self.test_user_id}")
+                print(f"📝 Session Token: {self.session_token}")
+                return True
             else:
-                self.log_test("Create Test User & Session", False, f"User creation failed: {result.stderr}")
+                self.log_test("Create Test User & Session", False, f"Creation failed: {result.stderr}")
                 
         except Exception as e:
             self.log_test("Create Test User & Session", False, f"Error: {str(e)}")
