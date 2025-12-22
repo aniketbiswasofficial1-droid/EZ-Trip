@@ -101,3 +101,52 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Refund amount is not being subtracted from the total expense before splitting among members, leading to incorrect balance calculations"
+
+backend:
+  - task: "Refund calculation in balance logic"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: true
+          agent: "main"
+          comment: "Fixed refund calculation logic in get_trip_balances(), get_trips(), and get_trip() endpoints. The logic now calculates net expense (total - refunds) and recalculates splits proportionally based on original split ratios. Tested with curl on two different trips and calculations are correct."
+        - working: "NA"
+          agent: "user"
+          comment: "User reported: Refund amount should be subtracted from total expense so it's distributed among expense members equally"
+
+frontend:
+  - task: "Display updated balances with refunds"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/TripDetail.jsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+        - working: "NA"
+          agent: "main"
+          comment: "Frontend should automatically display correct balances as it fetches data from the fixed backend endpoints. Need to verify UI displays correctly."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Refund calculation in balance logic"
+    - "Display updated balances with refunds"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+    - agent: "main"
+      message: "Fixed the refund calculation bug. The issue was that refunds were being added as separate adjustments instead of reducing the expense before splitting. Updated three endpoints (get_trip_balances, get_trips, get_trip) to calculate net expense amount and proportionally adjust splits. Backend tested successfully with curl - calculations are mathematically correct. Frontend needs visual verification via testing subagent."
