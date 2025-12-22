@@ -180,9 +180,20 @@ const TripDetail = () => {
       return;
     }
 
-    if (newExpense.payers.length === 0) {
-      toast.error("Please select at least one payer");
-      return;
+    // Build payers array based on mode
+    let payersArray = [];
+    if (multiplePayersMode) {
+      payersArray = newExpense.payers.filter(p => p.amount > 0);
+      if (payersArray.length === 0) {
+        toast.error("Please enter amounts for payers");
+        return;
+      }
+    } else {
+      if (!singlePayer) {
+        toast.error("Please select who paid");
+        return;
+      }
+      payersArray = [{ user_id: singlePayer, amount: parseFloat(newExpense.total_amount) }];
     }
 
     if (newExpense.splits.length === 0) {
@@ -197,7 +208,7 @@ const TripDetail = () => {
         total_amount: parseFloat(newExpense.total_amount),
         currency: newExpense.currency,
         category: newExpense.category,
-        payers: newExpense.payers,
+        payers: payersArray,
         splits: newExpense.splits,
       };
 
@@ -216,6 +227,88 @@ const TripDetail = () => {
     }
   };
 
+  // Handle expense update
+  const handleUpdateExpense = async (e) => {
+    e.preventDefault();
+
+    if (!newExpense.description || !newExpense.total_amount) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Build payers array based on mode
+    let payersArray = [];
+    if (multiplePayersMode) {
+      payersArray = newExpense.payers.filter(p => p.amount > 0);
+      if (payersArray.length === 0) {
+        toast.error("Please enter amounts for payers");
+        return;
+      }
+    } else {
+      if (!singlePayer) {
+        toast.error("Please select who paid");
+        return;
+      }
+      payersArray = [{ user_id: singlePayer, amount: parseFloat(newExpense.total_amount) }];
+    }
+
+    if (newExpense.splits.length === 0) {
+      toast.error("Please select at least one person to split with");
+      return;
+    }
+
+    try {
+      const payload = {
+        description: newExpense.description,
+        total_amount: parseFloat(newExpense.total_amount),
+        currency: newExpense.currency,
+        category: newExpense.category,
+        payers: payersArray,
+        splits: newExpense.splits,
+      };
+
+      await axios.put(`${API}/expenses/${selectedExpense.expense_id}`, payload, { withCredentials: true });
+
+      toast.success("Expense updated successfully!");
+      setEditExpenseOpen(false);
+      setSelectedExpense(null);
+      resetExpenseForm();
+      fetchExpenses();
+      fetchBalances();
+      fetchSettlements();
+      fetchTrip();
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      toast.error("Failed to update expense");
+    }
+  };
+
+  // Open edit expense dialog
+  const openEditExpense = (expense) => {
+    setSelectedExpense(expense);
+    
+    // Check if multiple payers
+    const hasMultiplePayers = expense.payers.length > 1;
+    setMultiplePayersMode(hasMultiplePayers);
+    
+    if (hasMultiplePayers) {
+      setSinglePayer("");
+    } else {
+      setSinglePayer(expense.payers[0]?.user_id || "");
+    }
+    
+    setNewExpense({
+      description: expense.description,
+      total_amount: expense.total_amount.toString(),
+      currency: expense.currency,
+      category: expense.category || "general",
+      payers: expense.payers,
+      splits: expense.splits,
+    });
+    
+    setEditExpenseOpen(true);
+  };
+
   const resetExpenseForm = () => {
     // Auto-select all members for split by default
     const defaultSplits = trip?.members.map(m => ({ user_id: m.user_id, amount: 0 })) || [];
@@ -228,6 +321,8 @@ const TripDetail = () => {
       payers: [],
       splits: defaultSplits,
     });
+    setMultiplePayersMode(false);
+    setSinglePayer("");
   };
 
   // Auto-calculate equal splits when amount changes or splits change
