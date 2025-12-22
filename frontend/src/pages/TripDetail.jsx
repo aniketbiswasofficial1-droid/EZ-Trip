@@ -1564,6 +1564,108 @@ const TripDetail = () => {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Refund Dialog */}
+        <Dialog open={editRefundOpen} onOpenChange={(open) => {
+          setEditRefundOpen(open);
+          if (!open) {
+            setSelectedRefund(null);
+            setSelectedExpense(null);
+            setNewRefund({ amount: "", reason: "", refunded_to: [] });
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-heading text-2xl">
+                Edit Refund
+              </DialogTitle>
+              {selectedExpense && (
+                <DialogDescription>
+                  Refund for: {selectedExpense.description} (
+                  {getCurrencySymbol(selectedExpense.currency)}
+                  {selectedExpense.total_amount.toFixed(2)})
+                </DialogDescription>
+              )}
+            </DialogHeader>
+            <form onSubmit={handleUpdateRefund} className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-refund-amount">Refund Amount</Label>
+                <Input
+                  id="edit-refund-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={newRefund.amount}
+                  onChange={(e) =>
+                    setNewRefund({ ...newRefund, amount: e.target.value })
+                  }
+                  data-testid="edit-refund-amount-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-refund-reason">Reason</Label>
+                <Textarea
+                  id="edit-refund-reason"
+                  placeholder="e.g., Cancelled booking, partial refund..."
+                  value={newRefund.reason}
+                  onChange={(e) =>
+                    setNewRefund({ ...newRefund, reason: e.target.value })
+                  }
+                  data-testid="edit-refund-reason-input"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Who receives the refund?</Label>
+                <div className="space-y-2">
+                  {trip?.members.map((member) => {
+                    const isSelected = newRefund.refunded_to.includes(member.user_id);
+                    return (
+                      <div
+                        key={member.user_id}
+                        className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg"
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setNewRefund({
+                                ...newRefund,
+                                refunded_to: [...newRefund.refunded_to, member.user_id],
+                              });
+                            } else {
+                              setNewRefund({
+                                ...newRefund,
+                                refunded_to: newRefund.refunded_to.filter(
+                                  (id) => id !== member.user_id
+                                ),
+                              });
+                            }
+                          }}
+                          data-testid={`edit-refund-recipient-${member.user_id}`}
+                        />
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={member.picture} />
+                          <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm">{member.name}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full rounded-full font-bold btn-glow"
+                data-testid="submit-edit-refund-btn"
+              >
+                Update Refund
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
