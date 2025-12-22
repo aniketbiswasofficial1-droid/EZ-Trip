@@ -751,52 +751,97 @@ const TripDetail = () => {
                     </div>
                   </div>
 
-                  {/* Who Paid */}
+                  {/* Who Paid - Simplified */}
                   <div className="space-y-3">
-                    <Label>Who paid?</Label>
-                    <div className="space-y-2">
-                      {trip.members.map((member) => {
-                        const isSelected = newExpense.payers.some(
-                          (p) => p.user_id === member.user_id
-                        );
-                        const payerData = newExpense.payers.find(
-                          (p) => p.user_id === member.user_id
-                        );
+                    <div className="flex items-center justify-between">
+                      <Label>Who paid?</Label>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Multiple payers</span>
+                        <Switch
+                          checked={multiplePayersMode}
+                          onCheckedChange={(checked) => {
+                            setMultiplePayersMode(checked);
+                            if (!checked) {
+                              setSinglePayer("");
+                              setNewExpense(prev => ({ ...prev, payers: [] }));
+                            }
+                          }}
+                          data-testid="multiple-payers-toggle"
+                        />
+                      </div>
+                    </div>
+                    
+                    {!multiplePayersMode ? (
+                      // Single payer mode - simple dropdown
+                      <Select value={singlePayer} onValueChange={setSinglePayer}>
+                        <SelectTrigger data-testid="single-payer-select">
+                          <SelectValue placeholder="Select who paid" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {trip.members.map((member) => (
+                            <SelectItem key={member.user_id} value={member.user_id}>
+                              <div className="flex items-center gap-2">
+                                <Avatar className="w-6 h-6">
+                                  <AvatarImage src={member.picture} />
+                                  <AvatarFallback className="text-xs">{member.name.charAt(0)}</AvatarFallback>
+                                </Avatar>
+                                {member.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      // Multiple payers mode - show amount inputs
+                      <div className="space-y-2 p-3 bg-secondary/30 rounded-lg border border-primary/20">
+                        <p className="text-xs text-muted-foreground mb-2">Enter amount paid by each person:</p>
+                        {trip.members.map((member) => {
+                          const payerData = newExpense.payers.find(
+                            (p) => p.user_id === member.user_id
+                          );
 
-                        return (
-                          <div
-                            key={member.user_id}
-                            className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg"
-                          >
-                            <Checkbox
-                              checked={isSelected}
-                              onCheckedChange={(checked) =>
-                                handlePayerToggle(member, checked)
-                              }
-                              data-testid={`payer-checkbox-${member.user_id}`}
-                            />
-                            <Avatar className="w-8 h-8">
-                              <AvatarImage src={member.picture} />
-                              <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
-                            </Avatar>
-                            <span className="flex-1 text-sm">{member.name}</span>
-                            {isSelected && (
+                          return (
+                            <div
+                              key={member.user_id}
+                              className="flex items-center gap-3"
+                            >
+                              <Avatar className="w-8 h-8">
+                                <AvatarImage src={member.picture} />
+                                <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                              </Avatar>
+                              <span className="flex-1 text-sm">{member.name}</span>
                               <Input
                                 type="number"
                                 step="0.01"
-                                placeholder="Amount"
+                                placeholder="0.00"
                                 value={payerData?.amount || ""}
-                                onChange={(e) =>
-                                  handlePayerAmountChange(member.user_id, e.target.value)
-                                }
+                                onChange={(e) => {
+                                  const amount = parseFloat(e.target.value) || 0;
+                                  setNewExpense(prev => {
+                                    const existing = prev.payers.find(p => p.user_id === member.user_id);
+                                    if (existing) {
+                                      return {
+                                        ...prev,
+                                        payers: prev.payers.map(p => 
+                                          p.user_id === member.user_id ? { ...p, amount } : p
+                                        )
+                                      };
+                                    } else {
+                                      return {
+                                        ...prev,
+                                        payers: [...prev.payers, { user_id: member.user_id, amount }]
+                                      };
+                                    }
+                                  });
+                                }}
                                 className="w-24 h-8 text-sm"
                                 data-testid={`payer-amount-${member.user_id}`}
                               />
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   {/* Split Between */}
