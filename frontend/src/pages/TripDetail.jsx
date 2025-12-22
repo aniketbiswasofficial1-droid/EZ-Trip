@@ -264,17 +264,19 @@ const TripDetail = () => {
 
   // Handle split selection
   const handleSplitToggle = (member, checked) => {
+    let newSplits;
     if (checked) {
-      setNewExpense((prev) => ({
-        ...prev,
-        splits: [...prev.splits, { user_id: member.user_id, amount: 0 }],
-      }));
+      newSplits = [...newExpense.splits, { user_id: member.user_id, amount: 0 }];
     } else {
-      setNewExpense((prev) => ({
-        ...prev,
-        splits: prev.splits.filter((s) => s.user_id !== member.user_id),
-      }));
+      newSplits = newExpense.splits.filter((s) => s.user_id !== member.user_id);
     }
+    
+    // Auto-recalculate equal splits
+    const calculatedSplits = autoCalculateEqualSplits(newExpense.total_amount, newSplits);
+    setNewExpense((prev) => ({
+      ...prev,
+      splits: calculatedSplits,
+    }));
   };
 
   // Auto-calculate equal splits
