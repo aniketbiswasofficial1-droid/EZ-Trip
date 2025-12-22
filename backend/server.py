@@ -1075,6 +1075,383 @@ async def update_llm_key(
     return {"message": "LLM key updated successfully"}
 
 # ========================
+# ADMIN ROUTES
+# ========================
+
+from admin_service import (
+    DEFAULT_FEATURE_TOGGLES, 
+    DEFAULT_SITE_CONTENT, 
+    LLM_MODELS,
+    FeatureToggle,
+    SiteContent,
+    AppSettings,
+    AdminStats
+)
+
+# Admin authentication check
+async def get_admin_user(request: Request) -> dict:
+    """Get current user and verify admin status"""
+    user = await get_current_user(request)
+    
+    # Check if user is admin
+    admin_doc = await db.admins.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    if not admin_doc:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    
+    return user
+
+# Initialize default settings
+async def init_admin_defaults():
+    """Initialize default feature toggles and site content if not exists"""
+    # Feature toggles
+    existing_toggles = await db.feature_toggles.count_documents({})
+    if existing_toggles == 0:
+        await db.feature_toggles.insert_many(DEFAULT_FEATURE_TOGGLES)
+    
+    # Site content
+    existing_content = await db.site_content.count_documents({})
+    if existing_content == 0:
+        await db.site_content.insert_many(DEFAULT_SITE_CONTENT)
+    
+    # App settings
+    existing_settings = await db.app_settings.find_one({"setting_id": "main"})
+    if not existing_settings:
+        await db.app_settings.insert_one({
+            "setting_id": "main",
+            "llm_provider": "openai",
+            "llm_model": "gpt-4o",
+            "default_currency": "USD",
+            "maintenance_mode": False,
+            "registration_enabled": True,
+            "ai_planner_enabled": True,
+            "max_trips_per_user": 50,
+            "max_members_per_trip": 20
+        })
+
+@app.on_event("startup")
+async def startup_event():
+    await init_admin_defaults()
+
+# --- Stats ---
+@admin_router.get("/stats")
+async def get_admin_stats(user: dict = Depends(get_admin_user)):
+    """Get admin dashboard statistics"""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    week_ago = now - timedelta(days=7)
+    
+    total_users = await db.users.count_documents({})
+    total_trips = await db.trips.count_documents({})
+    total_expenses = await db.expenses.count_documents({})
+    total_refunds = await db.refunds.count_documents({})
+    total_saved_plans = await db.saved_plans.count_documents({})
+    
+    # Active users today (sessions created today)
+    active_today = await db.user_sessions.count_documents({
+        "created_at": {"$gte": today_start.isoformat()}
+    })
+    
+    # New users this week
+    new_this_week = await db.users.count_documents({
+        "created_at": {"$gte": week_ago.isoformat()}
+    })
+    
+    # Popular destinations from saved plans
+    pipeline = [
+        {"$group": {"_id": "$destination", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 5}
+    ]
+    destinations = await db.saved_plans.aggregate(pipeline).to_list(5)
+    popular_destinations = [{"destination": d["_id"], "count": d["count"]} for d in destinations if d["_id"]]
+    
+    # Expenses by currency
+    currency_pipeline = [
+        {"$group": {"_id": "$currency", "total": {"$sum": "$total_amount"}, "count": {"$sum": 1}}},
+        {"$sort": {"total": -1}}
+    ]
+    currencies = await db.expenses.aggregate(currency_pipeline).to_list(10)
+    expense_by_currency = [{"currency": c["_id"], "total": c["total"], "count": c["count"]} for c in currencies if c["_id"]]
+    
+    return {
+        "total_users": total_users,
+        "total_trips": total_trips,
+        "total_expenses": total_expenses,
+        "total_refunds": total_refunds,
+        "total_saved_plans": total_saved_plans,
+        "active_users_today": active_today,
+        "new_users_this_week": new_this_week,
+        "popular_destinations": popular_destinations,
+        "expense_by_currency": expense_by_currency
+    }
+
+# --- Users Management ---
+@admin_router.get("/users")
+async def get_all_users(
+    skip: int = 0,
+    limit: int = 50,
+    user: dict = Depends(get_admin_user)
+):
+    """Get all users with pagination"""
+    users = await db.users.find({}, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+    total = await db.users.count_documents({})
+    
+    # Add trip count for each user
+    for u in users:
+        u["trip_count"] = await db.trips.count_documents({"members.user_id": u["user_id"]})
+        u["is_admin"] = await db.admins.find_one({"user_id": u["user_id"]}) is not None
+    
+    return {"users": users, "total": total, "skip": skip, "limit": limit}
+
+@admin_router.post("/users/{user_id}/toggle-admin")
+async def toggle_admin_status(
+    user_id: str,
+    user: dict = Depends(get_admin_user)
+):
+    """Toggle admin status for a user"""
+    target_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    existing_admin = await db.admins.find_one({"user_id": user_id})
+    
+    if existing_admin:
+        await db.admins.delete_one({"user_id": user_id})
+        return {"message": "Admin access revoked", "is_admin": False}
+    else:
+        await db.admins.insert_one({
+            "user_id": user_id,
+            "granted_by": user["user_id"],
+            "granted_at": datetime.now(timezone.utc).isoformat()
+        })
+        return {"message": "Admin access granted", "is_admin": True}
+
+@admin_router.post("/users/{user_id}/toggle-status")
+async def toggle_user_status(
+    user_id: str,
+    user: dict = Depends(get_admin_user)
+):
+    """Enable/disable a user account"""
+    target_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    new_status = not target_user.get("disabled", False)
+    await db.users.update_one(
+        {"user_id": user_id},
+        {"$set": {"disabled": new_status}}
+    )
+    
+    if new_status:
+        # Invalidate all sessions for disabled user
+        await db.user_sessions.delete_many({"user_id": user_id})
+    
+    return {"message": f"User {'disabled' if new_status else 'enabled'}", "disabled": new_status}
+
+# --- Trips Management ---
+@admin_router.get("/trips")
+async def get_all_trips(
+    skip: int = 0,
+    limit: int = 50,
+    user: dict = Depends(get_admin_user)
+):
+    """Get all trips with pagination"""
+    trips = await db.trips.find({}, {"_id": 0}).skip(skip).limit(limit).to_list(limit)
+    total = await db.trips.count_documents({})
+    
+    for trip in trips:
+        trip["expense_count"] = await db.expenses.count_documents({"trip_id": trip["trip_id"]})
+        if isinstance(trip.get("created_at"), str):
+            trip["created_at"] = datetime.fromisoformat(trip["created_at"])
+    
+    return {"trips": trips, "total": total, "skip": skip, "limit": limit}
+
+@admin_router.delete("/trips/{trip_id}")
+async def admin_delete_trip(
+    trip_id: str,
+    user: dict = Depends(get_admin_user)
+):
+    """Delete a trip (admin)"""
+    trip = await db.trips.find_one({"trip_id": trip_id}, {"_id": 0})
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    await db.trips.delete_one({"trip_id": trip_id})
+    await db.expenses.delete_many({"trip_id": trip_id})
+    await db.refunds.delete_many({"trip_id": trip_id})
+    
+    return {"message": "Trip deleted"}
+
+# --- Feature Toggles ---
+@admin_router.get("/features")
+async def get_feature_toggles(user: dict = Depends(get_admin_user)):
+    """Get all feature toggles"""
+    toggles = await db.feature_toggles.find({}, {"_id": 0}).to_list(100)
+    return toggles
+
+@admin_router.put("/features/{feature_id}")
+async def update_feature_toggle(
+    feature_id: str,
+    enabled: bool,
+    user: dict = Depends(get_admin_user)
+):
+    """Update a feature toggle"""
+    result = await db.feature_toggles.update_one(
+        {"feature_id": feature_id},
+        {"$set": {"enabled": enabled, "updated_by": user["user_id"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Feature not found")
+    
+    return {"message": "Feature updated", "feature_id": feature_id, "enabled": enabled}
+
+@admin_router.put("/features/bulk")
+async def bulk_update_features(
+    updates: List[Dict[str, Any]],
+    user: dict = Depends(get_admin_user)
+):
+    """Bulk update feature toggles"""
+    for update in updates:
+        await db.feature_toggles.update_one(
+            {"feature_id": update["feature_id"]},
+            {"$set": {"enabled": update["enabled"], "updated_by": user["user_id"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+    
+    return {"message": f"Updated {len(updates)} features"}
+
+# --- Site Content ---
+@admin_router.get("/content")
+async def get_site_content(user: dict = Depends(get_admin_user)):
+    """Get all editable site content"""
+    content = await db.site_content.find({}, {"_id": 0}).to_list(100)
+    return content
+
+@admin_router.put("/content/{content_id}")
+async def update_site_content(
+    content_id: str,
+    value: str,
+    user: dict = Depends(get_admin_user)
+):
+    """Update site content"""
+    result = await db.site_content.update_one(
+        {"content_id": content_id},
+        {"$set": {"value": value, "updated_by": user["user_id"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Content not found")
+    
+    return {"message": "Content updated", "content_id": content_id}
+
+@admin_router.put("/content/bulk")
+async def bulk_update_content(
+    updates: List[Dict[str, str]],
+    user: dict = Depends(get_admin_user)
+):
+    """Bulk update site content"""
+    for update in updates:
+        await db.site_content.update_one(
+            {"content_id": update["content_id"]},
+            {"$set": {"value": update["value"], "updated_by": user["user_id"], "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+    
+    return {"message": f"Updated {len(updates)} content items"}
+
+# --- App Settings ---
+@admin_router.get("/settings")
+async def get_app_settings(user: dict = Depends(get_admin_user)):
+    """Get app settings"""
+    settings = await db.app_settings.find_one({"setting_id": "main"}, {"_id": 0})
+    if not settings:
+        settings = {
+            "setting_id": "main",
+            "llm_provider": "openai",
+            "llm_model": "gpt-4o",
+            "default_currency": "USD",
+            "maintenance_mode": False,
+            "registration_enabled": True,
+            "ai_planner_enabled": True,
+            "max_trips_per_user": 50,
+            "max_members_per_trip": 20
+        }
+    
+    # Add available models
+    settings["available_models"] = LLM_MODELS
+    
+    return settings
+
+@admin_router.put("/settings")
+async def update_app_settings(
+    settings: Dict[str, Any],
+    user: dict = Depends(get_admin_user)
+):
+    """Update app settings"""
+    # Don't allow updating certain fields
+    settings.pop("setting_id", None)
+    settings.pop("available_models", None)
+    
+    settings["updated_by"] = user["user_id"]
+    settings["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    await db.app_settings.update_one(
+        {"setting_id": "main"},
+        {"$set": settings},
+        upsert=True
+    )
+    
+    # Update LLM key in environment if provided
+    if "llm_key" in settings and settings["llm_key"]:
+        os.environ['EMERGENT_LLM_KEY'] = settings["llm_key"]
+    
+    return {"message": "Settings updated"}
+
+# --- Public endpoints for feature flags and content ---
+@api_router.get("/public/features")
+async def get_public_features():
+    """Get enabled features for frontend (no auth required)"""
+    toggles = await db.feature_toggles.find({}, {"_id": 0, "feature_id": 1, "enabled": 1}).to_list(100)
+    return {t["feature_id"]: t["enabled"] for t in toggles}
+
+@api_router.get("/public/content")
+async def get_public_content():
+    """Get site content for frontend (no auth required)"""
+    content = await db.site_content.find({}, {"_id": 0}).to_list(100)
+    # Organize by section
+    organized = {}
+    for c in content:
+        section = c.get("section", "other")
+        if section not in organized:
+            organized[section] = {}
+        organized[section][c["key"]] = c["value"]
+    return organized
+
+@api_router.get("/public/settings")
+async def get_public_settings():
+    """Get public app settings (no auth required)"""
+    settings = await db.app_settings.find_one({"setting_id": "main"}, {"_id": 0})
+    if not settings:
+        return {
+            "maintenance_mode": False,
+            "registration_enabled": True,
+            "ai_planner_enabled": True
+        }
+    
+    # Only return public settings
+    return {
+        "maintenance_mode": settings.get("maintenance_mode", False),
+        "registration_enabled": settings.get("registration_enabled", True),
+        "ai_planner_enabled": settings.get("ai_planner_enabled", True)
+    }
+
+# --- Check Admin Status ---
+@admin_router.get("/check")
+async def check_admin_status(user: dict = Depends(get_current_user)):
+    """Check if current user is admin"""
+    admin_doc = await db.admins.find_one({"user_id": user["user_id"]}, {"_id": 0})
+    return {"is_admin": admin_doc is not None}
+
+# ========================
 # INCLUDE ROUTERS
 # ========================
 
@@ -1083,6 +1460,7 @@ api_router.include_router(trips_router)
 api_router.include_router(expenses_router)
 api_router.include_router(refunds_router)
 api_router.include_router(planner_router)
+api_router.include_router(admin_router)
 
 @api_router.get("/")
 async def root():
