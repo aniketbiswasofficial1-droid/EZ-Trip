@@ -638,8 +638,14 @@ async def get_trip_balances(
             if payer["user_id"] in balances:
                 balances[payer["user_id"]] += payer["amount"]
         
+        # Subtract refunds from recipients (treat as negative payment)
+        for refund in expense_refunds:
+            for user_id in refund.get("refunded_to", []):
+                if user_id in balances:
+                    per_person_refund = refund["amount"] / len(refund["refunded_to"])
+                    balances[user_id] -= per_person_refund
+        
         # Recalculate splits based on net amount
-        # The refund is already accounted for in net_amount, so we don't subtract it separately
         splits = expense.get("splits", [])
         if splits and original_amount > 0:
             # Calculate each person's share based on the net amount
