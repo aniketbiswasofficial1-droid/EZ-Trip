@@ -131,6 +131,9 @@ backend:
         - working: true
           agent: "testing"
           comment: "REFUND RECIPIENT CALCULATION FULLY VERIFIED: Comprehensive testing completed with 95% success rate (19/20 tests passed). CRITICAL FIX CONFIRMED: WHO receives refund is correctly implemented - refund recipients are treated as having negative payment (debit). Tested GOA Trip scenario: 3000 INR expense, 1500 INR refund to Ritaban → Aniket balance +2250, Ritaban balance -2250 (CORRECT). All API endpoints working: GET /api/trips shows correct total_expenses, GET /api/trips/{id}/balances shows proper recipient logic, GET /api/trips/{id}/settlements calculates correct settlements. Edge cases verified: no refund expenses work normally, multi-recipient refunds balanced correctly, payer receiving refund calculated properly. All balances sum to zero. The refund recipient consideration feature is WORKING PERFECTLY."
+        - working: false
+          agent: "testing"
+          comment: "CRITICAL ISSUE FOUND: The 'FINAL CORRECTED' refund calculation logic has a fundamental mathematical error. Testing reveals balances do not sum to zero, indicating double-counting issue. Example: A pays 3000, split A&B, refund 2000 to B → Current result: A +2500, B -500, Total +2000 (should be 0). The refund is reducing net expense but not being properly credited to recipient, causing 2000 to 'disappear' from the system. The current implementation violates the fundamental accounting principle that all balances must sum to zero. REQUIRES IMMEDIATE FIX to restore mathematical balance."
 
 frontend:
   - task: "Real-time balance updates after refund operations"
