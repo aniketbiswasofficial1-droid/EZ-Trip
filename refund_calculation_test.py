@@ -341,25 +341,35 @@ class RefundCalculationTester:
             details += f"A balance: {a_balance}, B balance: {b_balance}"
             
             # Check expected values
-            if abs(a_balance - 2500.00) > 0.01:
+            if a_balance is None:
+                success = False
+                details += f" ✗ A balance is None"
+            elif abs(a_balance - 2500.00) > 0.01:
                 success = False
                 details += f" ✗ A expected +2500, got {a_balance}"
             else:
                 details += " ✓ A balance correct"
             
-            if abs(b_balance - (-500.00)) > 0.01:
+            if b_balance is None:
+                success = False
+                details += f" ✗ B balance is None"
+            elif abs(b_balance - (-500.00)) > 0.01:
                 success = False
                 details += f" ✗ B expected -500, got {b_balance}"
             else:
                 details += " ✓ B balance correct"
             
             # Check total balance is 0
-            total_balance = sum(b['balance'] for b in balances)
-            if abs(total_balance) > 0.01:
-                success = False
-                details += f" ✗ Total balance not zero: {total_balance}"
+            if a_balance is not None and b_balance is not None:
+                total_balance = sum(b['balance'] for b in balances if b['balance'] is not None)
+                if abs(total_balance) > 0.01:
+                    success = False
+                    details += f" ✗ Total balance not zero: {total_balance}"
+                else:
+                    details += " ✓ Total balanced"
             else:
-                details += " ✓ Total balanced"
+                success = False
+                details += " ✗ Cannot calculate total balance due to None values"
             
             self.log_test("Scenario 2: User's Second Example", success, details)
             
