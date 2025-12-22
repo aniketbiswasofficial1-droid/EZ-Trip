@@ -339,8 +339,11 @@ async def create_trip(
     
     await db.trips.insert_one(trip_doc)
     
+    # Remove created_at from trip_doc before passing to TripResponse
+    trip_response_data = {k: v for k, v in trip_doc.items() if k != "created_at"}
+    
     return TripResponse(
-        **trip_doc,
+        **trip_response_data,
         created_at=datetime.fromisoformat(trip_doc["created_at"]),
         total_expenses=0,
         your_balance=0
