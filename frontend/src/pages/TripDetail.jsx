@@ -1033,6 +1033,16 @@ const TripDetail = () => {
                       <Button
                         variant="outline"
                         size="sm"
+                        onClick={() => openEditExpense(expense)}
+                        className="rounded-full"
+                        data-testid={`edit-expense-btn-${expense.expense_id}`}
+                      >
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setSelectedExpense(expense);
                           setAddRefundOpen(true);
