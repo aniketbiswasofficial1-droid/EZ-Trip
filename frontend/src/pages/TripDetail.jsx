@@ -1062,17 +1062,28 @@ const TripDetail = () => {
                         {expense.refunds.map((refund) => (
                           <div
                             key={refund.refund_id}
-                            className="text-sm text-muted-foreground"
+                            className="flex items-center justify-between py-2 border-b border-border last:border-0"
                             data-testid={`refund-${refund.refund_id}`}
                           >
-                            <span className="text-primary font-medium">
-                              {getCurrencySymbol(expense.currency)}
-                              {refund.amount.toFixed(2)}
-                            </span>{" "}
-                            - {refund.reason}
-                            <span className="text-xs ml-2">
-                              (to: {refund.refunded_to.map((id) => getMemberName(id)).join(", ")})
-                            </span>
+                            <div className="text-sm text-muted-foreground">
+                              <span className="text-primary font-medium">
+                                {getCurrencySymbol(expense.currency)}
+                                {refund.amount.toFixed(2)}
+                              </span>{" "}
+                              - {refund.reason}
+                              <span className="text-xs ml-2">
+                                (to: {refund.refunded_to.map((id) => getMemberName(id)).join(", ")})
+                              </span>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openEditRefund(refund, expense)}
+                              className="h-7 px-2"
+                              data-testid={`edit-refund-btn-${refund.refund_id}`}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                           </div>
                         ))}
                       </div>
