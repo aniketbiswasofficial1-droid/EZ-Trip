@@ -36,6 +36,7 @@ import {
   ChevronRight,
   Globe,
   MapPin,
+  Sparkles,
 } from "lucide-react";
 
 const TRIP_COVERS = [
