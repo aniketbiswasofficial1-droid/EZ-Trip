@@ -77,10 +77,8 @@ const TripPlanner = () => {
   
   // Form state
   const [destination, setDestination] = useState("");
-  const [dateRange, setDateRange] = useState({
-    from: addDays(new Date(), 7),
-    to: addDays(new Date(), 14),
-  });
+  const [startDate, setStartDate] = useState(addDays(new Date(), 7));
+  const [endDate, setEndDate] = useState(addDays(new Date(), 14));
   const [numTravelers, setNumTravelers] = useState(2);
   const [budgetPreference, setBudgetPreference] = useState("moderate");
   const [interests, setInterests] = useState([]);
