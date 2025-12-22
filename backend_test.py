@@ -838,6 +838,12 @@ class SplitEaseAPITester:
             # Test refund operations
             self.test_refund_operations(expense_id)
             
+            # Test refund calculation fix (PRIORITY TEST)
+            self.test_refund_calculation_fix()
+            
+            # Test refund edge cases
+            self.test_refund_edge_cases()
+            
             # Test AI Trip Planner endpoints
             plan_id = self.test_ai_trip_planner_endpoints()
             
