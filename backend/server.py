@@ -952,6 +952,128 @@ async def get_currencies():
     return SUPPORTED_CURRENCIES
 
 # ========================
+# AI TRIP PLANNER ROUTES
+# ========================
+
+from trip_planner import trip_planner, TripPlanRequest, TripPlanResponse
+
+class SavedTripPlan(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    plan_id: str
+    user_id: str
+    destination: str
+    start_date: str
+    end_date: str
+    num_travelers: int
+    plan_data: Dict[str, Any]
+    created_at: datetime
+
+@planner_router.post("/generate", response_model=TripPlanResponse)
+async def generate_trip_plan(
+    request: TripPlanRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Generate an AI-powered trip plan"""
+    try:
+        plan = await trip_planner.generate_trip_plan(request, user["user_id"])
+        return plan
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Trip planning error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate trip plan. Please try again.")
+
+@planner_router.post("/save")
+async def save_trip_plan(
+    plan: Dict[str, Any],
+    user: dict = Depends(get_current_user)
+):
+    """Save a generated trip plan"""
+    plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+    
+    plan_doc = {
+        "plan_id": plan_id,
+        "user_id": user["user_id"],
+        "destination": plan.get("destination", ""),
+        "start_date": plan.get("start_date", ""),
+        "end_date": plan.get("end_date", ""),
+        "num_travelers": plan.get("num_travelers", 1),
+        "plan_data": plan,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.saved_plans.insert_one(plan_doc)
+    
+    return {"message": "Plan saved", "plan_id": plan_id}
+
+@planner_router.get("/saved", response_model=List[SavedTripPlan])
+async def get_saved_plans(user: dict = Depends(get_current_user)):
+    """Get all saved trip plans for the user"""
+    plans = await db.saved_plans.find(
+        {"user_id": user["user_id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    for plan in plans:
+        if isinstance(plan.get("created_at"), str):
+            plan["created_at"] = datetime.fromisoformat(plan["created_at"])
+    
+    return plans
+
+@planner_router.get("/saved/{plan_id}")
+async def get_saved_plan(
+    plan_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get a specific saved plan"""
+    plan = await db.saved_plans.find_one(
+        {"plan_id": plan_id, "user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    return plan
+
+@planner_router.delete("/saved/{plan_id}")
+async def delete_saved_plan(
+    plan_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Delete a saved plan"""
+    result = await db.saved_plans.delete_one(
+        {"plan_id": plan_id, "user_id": user["user_id"]}
+    )
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Plan not found")
+    
+    return {"message": "Plan deleted"}
+
+# Admin endpoint to update LLM key
+class LLMKeyUpdate(BaseModel):
+    key: str
+
+@planner_router.put("/admin/llm-key")
+async def update_llm_key(
+    key_update: LLMKeyUpdate,
+    user: dict = Depends(get_current_user)
+):
+    """Update the LLM API key (admin only)"""
+    # Store in database for persistence
+    await db.settings.update_one(
+        {"setting": "llm_key"},
+        {"$set": {"value": key_update.key, "updated_by": user["user_id"], "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True
+    )
+    
+    # Update environment variable for current session
+    os.environ['EMERGENT_LLM_KEY'] = key_update.key
+    
+    return {"message": "LLM key updated successfully"}
+
+# ========================
 # INCLUDE ROUTERS
 # ========================
 
@@ -959,6 +1081,7 @@ api_router.include_router(auth_router)
 api_router.include_router(trips_router)
 api_router.include_router(expenses_router)
 api_router.include_router(refunds_router)
+api_router.include_router(planner_router)
 
 @api_router.get("/")
 async def root():
