@@ -133,6 +133,7 @@ const TripPlanner = () => {
           end_date: format(endDate, "yyyy-MM-dd"),
           num_travelers: numTravelers,
           budget_preference: budgetPreference,
+          currency: currency,
           interests,
           accommodation_type: accommodationType,
           include_flights: includeFlights,
