@@ -686,8 +686,11 @@ async def create_expense(
     
     await db.expenses.insert_one(expense_doc)
     
+    # Remove date and created_at from expense_doc before passing to ExpenseResponse
+    expense_response_data = {k: v for k, v in expense_doc.items() if k not in ["date", "created_at"]}
+    
     return ExpenseResponse(
-        **expense_doc,
+        **expense_response_data,
         date=expense_date,
         created_at=datetime.fromisoformat(expense_doc["created_at"]),
         refunds=[],
