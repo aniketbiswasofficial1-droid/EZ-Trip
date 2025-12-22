@@ -624,7 +624,8 @@ async def get_trip_balances(
     for expense in expenses:
         # Calculate net expense amount after refunds
         expense_id = expense["expense_id"]
-        total_refunded = sum(r["amount"] for r in refunds_by_expense.get(expense_id, []))
+        expense_refunds = refunds_by_expense.get(expense_id, [])
+        total_refunded = sum(r["amount"] for r in expense_refunds)
         net_amount = expense["total_amount"] - total_refunded
         original_amount = expense["total_amount"]
         
@@ -632,6 +633,14 @@ async def get_trip_balances(
         for payer in expense.get("payers", []):
             if payer["user_id"] in balances:
                 balances[payer["user_id"]] += payer["amount"]
+        
+        # Subtract refunds from whoever received them (treat as negative payment)
+        for refund in expense_refunds:
+            for user_id in refund.get("refunded_to", []):
+                if user_id in balances:
+                    # Person who received refund gets debited
+                    per_person_refund = refund["amount"] / len(refund["refunded_to"])
+                    balances[user_id] -= per_person_refund
         
         # Recalculate splits based on net amount
         splits = expense.get("splits", [])
