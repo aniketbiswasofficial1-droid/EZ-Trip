@@ -489,19 +489,28 @@ class RefundCalculationTester:
             details += f"A: {a_balance}, B: {b_balance}, C: {c_balance}, D: {d_balance}, E: {e_balance}"
             
             # Check expected values (allowing for rounding)
-            if abs(a_balance - 3833.33) > 0.02:
+            if a_balance is None:
+                success = False
+                details += f" ✗ A balance is None"
+            elif abs(a_balance - 3833.33) > 0.02:
                 success = False
                 details += f" ✗ A expected ~3833.33, got {a_balance}"
             else:
                 details += " ✓ A balance correct"
             
-            if abs(b_balance - (-1166.67)) > 0.02:
+            if b_balance is None:
+                success = False
+                details += f" ✗ B balance is None"
+            elif abs(b_balance - (-1166.67)) > 0.02:
                 success = False
                 details += f" ✗ B expected ~-1166.67, got {b_balance}"
             else:
                 details += " ✓ B balance correct"
             
-            if abs(c_balance - (-1166.66)) > 0.02:
+            if c_balance is None:
+                success = False
+                details += f" ✗ C balance is None"
+            elif abs(c_balance - (-1166.66)) > 0.02:
                 success = False
                 details += f" ✗ C expected ~-1166.66, got {c_balance}"
             else:
