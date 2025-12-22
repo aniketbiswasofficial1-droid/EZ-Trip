@@ -178,6 +178,15 @@ const Dashboard = () => {
                 <Sparkles className="w-4 h-4 mr-2" />
                 AI Trip Planner
               </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem
+                  onClick={() => navigate("/admin")}
+                  data-testid="admin-menu-btn"
+                >
+                  <Shield className="w-4 h-4 mr-2" />
+                  Admin Panel
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={logout}
