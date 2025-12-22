@@ -174,7 +174,7 @@ class TripPlannerService:
                 weather_info += f"- {w.date}: {w.weather_description}, {w.temperature_min}°C - {w.temperature_max}°C, {w.precipitation_probability}% rain chance\n"
         
         # Create AI prompt
-        system_prompt = """You are an expert travel planner AI. You create detailed, practical trip itineraries with accurate cost estimates.
+        system_prompt = """You are an expert travel planner AI with access to current pricing data. You create detailed, practical trip itineraries with accurate cost estimates and price comparisons across platforms.
         
 Your responses must be in valid JSON format matching this structure:
 {
@@ -200,7 +200,43 @@ Your responses must be in valid JSON format matching this structure:
         "miscellaneous": 100,
         "total_per_person": 2000,
         "total_group": 4000,
-        "currency": "USD"
+        "currency": "USD",
+        "price_comparisons": [
+            {
+                "category": "flights",
+                "item_name": "Round trip flight",
+                "prices": [
+                    {"platform": "Google Flights", "price": 450, "url": "https://flights.google.com"},
+                    {"platform": "Skyscanner", "price": 480, "url": "https://skyscanner.com"},
+                    {"platform": "Kayak", "price": 465, "url": "https://kayak.com"}
+                ],
+                "best_deal": {"platform": "Google Flights", "price": 450},
+                "savings_potential": 30
+            },
+            {
+                "category": "hotels",
+                "item_name": "Recommended hotel per night",
+                "prices": [
+                    {"platform": "Booking.com", "price": 120, "url": "https://booking.com"},
+                    {"platform": "Hotels.com", "price": 135, "url": "https://hotels.com"},
+                    {"platform": "Airbnb", "price": 95, "url": "https://airbnb.com"},
+                    {"platform": "Expedia", "price": 125, "url": "https://expedia.com"}
+                ],
+                "best_deal": {"platform": "Airbnb", "price": 95},
+                "savings_potential": 40
+            },
+            {
+                "category": "activities",
+                "item_name": "Top attraction tickets",
+                "prices": [
+                    {"platform": "GetYourGuide", "price": 45, "url": "https://getyourguide.com"},
+                    {"platform": "Viator", "price": 50, "url": "https://viator.com"},
+                    {"platform": "Official Site", "price": 40, "url": ""}
+                ],
+                "best_deal": {"platform": "Official Site", "price": 40},
+                "savings_potential": 10
+            }
+        ]
     },
     "travel_tips": ["tip1", "tip2"],
     "packing_suggestions": ["item1", "item2"],
@@ -214,7 +250,10 @@ Consider:
 - Realistic travel times between locations
 - Local food costs, transportation costs
 - Budget preference affects hotel stars and restaurant choices
-- Include mix of popular and hidden gem attractions"""
+- Include mix of popular and hidden gem attractions
+- ALWAYS provide price comparisons across multiple booking platforms
+- Include actual platform names like Booking.com, Airbnb, Expedia, Skyscanner, Google Flights, Kayak, GetYourGuide, Viator
+- Prices should reflect realistic current market rates for the destination and dates"""
 
         user_prompt = f"""Plan a detailed trip with the following details:
 
