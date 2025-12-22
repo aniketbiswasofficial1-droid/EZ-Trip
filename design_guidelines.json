@@ -1,0 +1,152 @@
+{
+  "identity": {
+    "name": "E1",
+    "role": "Anti-AI Creative Designer",
+    "principles": [
+      "Fusion over Imitation",
+      "Emotion First",
+      "Content is King",
+      "Zoom In",
+      "Negative Space",
+      "Contrast"
+    ],
+    "anti_patterns": [
+      "Purple/Teal for CTA",
+      "Inter font everywhere",
+      "Center-everything layout",
+      "Gradient overload"
+    ]
+  },
+  "typography": {
+    "headings": {
+      "font_family": "Syne, sans-serif",
+      "weights": ["700", "800"],
+      "usage": "All section titles, hero text, and major data points.",
+      "letter_spacing": "tracking-tight"
+    },
+    "body": {
+      "font_family": "Manrope, sans-serif",
+      "weights": ["400", "500", "600"],
+      "usage": "Paragraphs, UI labels, inputs, and tabular data.",
+      "letter_spacing": "tracking-normal"
+    },
+    "mono": {
+      "font_family": "JetBrains Mono, monospace",
+      "usage": "Transaction IDs, code snippets, or technical details."
+    },
+    "installation": "Import fonts via Google Fonts in index.css: @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600&family=Syne:wght@700;800&family=JetBrains+Mono:wght@400&display=swap');"
+  },
+  "colors": {
+    "theme": "dark",
+    "palette": {
+      "background": "#050505",
+      "foreground": "#EDEDED",
+      "card": "#0A0A0A",
+      "card_foreground": "#EDEDED",
+      "popover": "#0A0A0A",
+      "popover_foreground": "#EDEDED",
+      "primary": "#CCFF00",
+      "primary_foreground": "#000000",
+      "secondary": "#1A1A1A",
+      "secondary_foreground": "#EDEDED",
+      "muted": "#1A1A1A",
+      "muted_foreground": "#888888",
+      "accent": "#1A1A1A",
+      "accent_foreground": "#CCFF00",
+      "destructive": "#FF003C",
+      "destructive_foreground": "#EDEDED",
+      "border": "#262626",
+      "input": "#262626",
+      "ring": "#CCFF00"
+    },
+    "usage_rules": [
+      "Use Primary (#CCFF00) ONLY for 'You are owed' and main CTAs.",
+      "Use Destructive (#FF003C) for 'You owe' and delete actions.",
+      "Backgrounds must be deep black (#050505), not gray.",
+      "Borders should be subtle (#262626) unless active."
+    ]
+  },
+  "layout": {
+    "spacing": {
+      "base": "Generous",
+      "scale": ["p-4", "p-6", "p-8", "p-12", "p-16", "p-24"],
+      "rule": "Use 2-3x more spacing than typical. Containers with borders must have internal padding (p-6 or p-8)."
+    },
+    "grid_system": {
+      "dashboard": "Bento Grid (Mode B: Control Room)",
+      "marketing": "Tetris Grid (Mode A)",
+      "mobile": "Single column (grid-cols-1) with bottom sheet navigation."
+    },
+    "containers": {
+      "max_width": "max-w-7xl",
+      "alignment": "Center on desktop, full width on mobile."
+    }
+  },
+  "components": {
+    "buttons": {
+      "style": "Sharp edges or Pill-shaped (choose one consistency). Let's go with Pill-shaped for a friendly finance vibe.",
+      "classes": "rounded-full font-bold tracking-wide transition-transform active:scale-95"
+    },
+    "cards": {
+      "style": "Flat, 1px border, no shadow by default.",
+      "classes": "bg-card border-border rounded-xl hover:border-primary/50 transition-colors duration-300"
+    },
+    "inputs": {
+      "style": "Minimal, bottom border or filled.",
+      "classes": "bg-secondary/50 border-transparent focus:border-primary focus:ring-0 rounded-lg h-12"
+    },
+    "navigation": {
+      "mobile": "Bottom fixed bar with blur effect (glassmorphism).",
+      "desktop": "Top sticky header with minimal links."
+    },
+    "ads": {
+      "style": "Native integration. Must look exactly like a Trip Card but with a 'Sponsored' badge.",
+      "badge_classes": "bg-white/10 text-xs px-2 py-1 rounded uppercase tracking-widest text-muted-foreground"
+    }
+  },
+  "visual_enhancers": {
+    "glassmorphism": "backdrop-blur-xl bg-black/60 border-b border-white/10",
+    "gradients": "No full-screen gradients. Use subtle mesh gradients in card backgrounds for 'Trips'.",
+    "motion": {
+      "library": "framer-motion",
+      "transitions": "type: 'spring', stiffness: 300, damping: 30",
+      "hover": "scale: 1.02"
+    },
+    "textures": "Add a subtle noise overlay to the main background to kill the digital flatness."
+  },
+  "images": {
+    "hero_bg": {
+      "url": "https://images.unsplash.com/photo-1764303017897-16f5009d2bb1?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Abstract Neon Finance Background",
+      "category": "background"
+    },
+    "friends_trip": {
+      "url": "https://images.unsplash.com/photo-1597736960442-d613cca349db?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "alt": "Friends traveling and laughing",
+      "category": "content"
+    },
+    "trip_covers": [
+      "https://images.unsplash.com/photo-1628584547352-70ec34799bc1?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "https://images.unsplash.com/photo-1655431571078-3a6b9d385d63?crop=entropy&cs=srgb&fm=jpg&q=85"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. INSTALL FONTS: Add the Google Fonts import to the top of src/index.css immediately.",
+    "2. CONFIGURE TAILWIND: Update tailwind.config.js with the colors defined in this JSON. Ensure 'darkMode' is set to 'class'.",
+    "3. OVERRIDE CSS VARIABLES: Replace the contents of the @layer base :root and .dark in src/index.css with the palette values provided here.",
+    "4. COMPONENT STYLING: When using Shadcn components, override their default radius and border colors to match the 'cards' and 'buttons' specs.",
+    "5. LAYOUT: Use the 'Bento Grid' approach for the main dashboard. Do not just stack cards vertically.",
+    "6. ADS: Implement ad slots as native components within the feed. Do not use standard banner sizes (728x90). Make them look like content.",
+    "7. MOTION: Wrap page transitions and list items with Framer Motion <motion.div>.",
+    "8. DATA-TESTID: Add data-testid attributes to all interactive elements (buttons, inputs, cards) for testing."
+  ],
+  "universal_guidelines": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur).",
+    "NEVER use AI assistant Emoji characters like 🤖🧠 etc.",
+    "Every interaction needs micro-animations.",
+    "Use 2-3x more spacing than feels comfortable."
+  ]
+}
