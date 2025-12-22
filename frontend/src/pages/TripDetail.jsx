@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,9 @@ import {
   ArrowRight,
   Calendar,
   Globe,
+  Pencil,
+  Lock,
+  Unlock,
 } from "lucide-react";
 import { format } from "date-fns";
 
