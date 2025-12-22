@@ -466,15 +466,19 @@ class SplitEaseAPITester:
 
         # Test Open-Meteo weather API
         try:
-            # Use Paris coordinates
+            # Use Paris coordinates with current date range
+            from datetime import datetime, timedelta
+            start_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+            end_date = (datetime.now() + timedelta(days=6)).strftime("%Y-%m-%d")
+            
             response = requests.get(
                 "https://api.open-meteo.com/v1/forecast",
                 params={
                     "latitude": 48.8566,
                     "longitude": 2.3522,
                     "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max,weathercode",
-                    "start_date": "2025-03-15",
-                    "end_date": "2025-03-20",
+                    "start_date": start_date,
+                    "end_date": end_date,
                     "timezone": "auto"
                 },
                 timeout=10
