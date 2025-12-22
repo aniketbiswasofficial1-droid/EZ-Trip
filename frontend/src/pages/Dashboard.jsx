@@ -158,6 +158,14 @@ const Dashboard = () => {
               </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem
+                onClick={() => navigate("/planner")}
+                data-testid="planner-menu-btn"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                AI Trip Planner
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
                 onClick={logout}
                 className="text-destructive focus:text-destructive"
                 data-testid="logout-btn"
