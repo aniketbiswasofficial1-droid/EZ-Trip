@@ -860,8 +860,11 @@ async def create_refund(
     
     await db.refunds.insert_one(refund_doc)
     
+    # Remove created_at from refund_doc before passing to RefundResponse
+    refund_response_data = {k: v for k, v in refund_doc.items() if k != "created_at"}
+    
     return RefundResponse(
-        **refund_doc,
+        **refund_response_data,
         expense_description=expense["description"],
         created_at=datetime.fromisoformat(refund_doc["created_at"])
     )
