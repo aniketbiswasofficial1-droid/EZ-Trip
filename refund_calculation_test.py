@@ -467,7 +467,7 @@ class RefundCalculationTester:
             
             # Expected: Aniket +2250, Ritaban -2250, Total: 0
             # (3000 expense, 1500 refund to Ritaban)
-            aniket_balance = balance_dict.get('Aniket', 0)
+            aniket_balance = balance_dict.get('Aniket Biswas', balance_dict.get('Aniket', 0))
             ritaban_balance = balance_dict.get('Ritaban', 0)
             
             expected_aniket = 2250.00
