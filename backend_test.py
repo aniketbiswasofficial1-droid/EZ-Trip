@@ -96,12 +96,14 @@ class SplitEaseAPITester:
             
             # Insert user
             import subprocess
-            user_cmd = f"""mongosh --eval "use('test_database'); db.users.insertOne({json.dumps(user_doc)});" """
+            user_json = json.dumps(user_doc).replace('"', '\\"')
+            user_cmd = f'mongosh --eval "use(\\"test_database\\"); db.users.insertOne({user_json});"'
             result = subprocess.run(user_cmd, shell=True, capture_output=True, text=True)
             
             if result.returncode == 0:
                 # Insert session
-                session_cmd = f"""mongosh --eval "use('test_database'); db.user_sessions.insertOne({json.dumps(session_doc)});" """
+                session_json = json.dumps(session_doc).replace('"', '\\"')
+                session_cmd = f'mongosh --eval "use(\\"test_database\\"); db.user_sessions.insertOne({session_json});"'
                 result = subprocess.run(session_cmd, shell=True, capture_output=True, text=True)
                 
                 if result.returncode == 0:
