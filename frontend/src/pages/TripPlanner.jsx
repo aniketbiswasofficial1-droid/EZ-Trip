@@ -255,41 +255,71 @@ const TripPlanner = () => {
                 )}
               </div>
 
-              {/* Date Range */}
+              {/* Date Range - Separate Inputs */}
               <div className="space-y-2">
                 <Label>When are you traveling?</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start text-left h-12"
-                      data-testid="date-picker-btn"
-                    >
-                      <CalendarIcon className="mr-2 h-5 w-5 text-muted-foreground" />
-                      {dateRange.from ? (
-                        dateRange.to ? (
-                          <>
-                            {format(dateRange.from, "MMM d, yyyy")} -{" "}
-                            {format(dateRange.to, "MMM d, yyyy")}
-                          </>
-                        ) : (
-                          format(dateRange.from, "MMM d, yyyy")
-                        )
-                      ) : (
-                        <span className="text-muted-foreground">Select dates</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="range"
-                      selected={dateRange}
-                      onSelect={setDateRange}
-                      numberOfMonths={2}
-                      disabled={(date) => date < new Date()}
-                    />
-                  </PopoverContent>
-                </Popover>
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Start Date */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Start Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left h-12"
+                          data-testid="start-date-btn"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {startDate ? format(startDate, "MMM d, yyyy") : "Select"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={(date) => {
+                            setStartDate(date);
+                            // Auto-adjust end date if needed
+                            if (date && endDate && date > endDate) {
+                              setEndDate(addDays(date, 1));
+                            }
+                          }}
+                          disabled={(date) => date < new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* End Date */}
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">End Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left h-12"
+                          data-testid="end-date-btn"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {endDate ? format(endDate, "MMM d, yyyy") : "Select"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          disabled={(date) => date < (startDate || new Date())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+                {errors.dates && (
+                  <p className="text-sm text-destructive">{errors.dates}</p>
+                )}
               </div>
 
               {/* Travelers */}
