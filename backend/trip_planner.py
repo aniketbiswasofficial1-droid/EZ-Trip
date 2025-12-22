@@ -19,6 +19,7 @@ class TripPlanRequest(BaseModel):
     end_date: str    # YYYY-MM-DD
     num_travelers: int = 1
     budget_preference: str = "moderate"  # budget, moderate, luxury
+    currency: str = "INR"  # Default to INR for India focus
     interests: List[str] = []  # e.g., ["adventure", "culture", "food", "relaxation"]
     accommodation_type: str = "hotel"  # hotel, hostel, airbnb, resort
     include_flights: bool = True
