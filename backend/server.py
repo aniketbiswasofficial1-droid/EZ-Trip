@@ -402,13 +402,8 @@ async def get_trips(user: dict = Depends(get_current_user)):
                 if payer["user_id"] == user["user_id"]:
                     user_balance += payer["amount"]
             
-            # Subtract refunds from whoever received them (treat as negative payment)
-            for refund in expense_refunds:
-                if user["user_id"] in refund.get("refunded_to", []):
-                    per_person_refund = refund["amount"] / len(refund["refunded_to"])
-                    user_balance -= per_person_refund
-            
             # What user owes (recalculated based on net amount)
+            # Refund is already handled in net_amount, no need to subtract separately
             splits = expense.get("splits", [])
             if splits and original_amount > 0:
                 for split in splits:
