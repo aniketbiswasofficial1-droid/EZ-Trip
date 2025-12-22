@@ -785,12 +785,16 @@ class RefundCalculationTester:
             details += f"A balance: {a_balance}, B balance: {b_balance}"
             
             # Check total balance is 0 (most important)
-            total_balance = sum(b['balance'] for b in balances)
-            if abs(total_balance) > 0.01:
-                success = False
-                details += f" ✗ Total balance not zero: {total_balance}"
+            if a_balance is not None and b_balance is not None:
+                total_balance = a_balance + b_balance
+                if abs(total_balance) > 0.01:
+                    success = False
+                    details += f" ✗ Total balance not zero: {total_balance}"
+                else:
+                    details += " ✓ Total balanced"
             else:
-                details += " ✓ Total balanced"
+                success = False
+                details += " ✗ Cannot calculate total balance due to None values"
             
             # For net = 0 case, the exact individual balances depend on implementation
             # The key is that the total should be balanced
