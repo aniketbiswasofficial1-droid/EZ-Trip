@@ -10,6 +10,7 @@ import LandingPage from "@/pages/LandingPage";
 import Dashboard from "@/pages/Dashboard";
 import TripDetail from "@/pages/TripDetail";
 import TripPlanner from "@/pages/TripPlanner";
+import AdminPanel from "@/pages/AdminPanel";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -184,6 +185,14 @@ function AppRouter() {
         element={
           <ProtectedRoute>
             <TripPlanner />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminPanel />
           </ProtectedRoute>
         }
       />
