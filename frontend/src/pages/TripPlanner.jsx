@@ -359,6 +359,26 @@ const TripPlanner = () => {
                 </Select>
               </div>
 
+              {/* Currency */}
+              <div className="space-y-2">
+                <Label>Currency</Label>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="h-12" data-testid="currency-select">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="INR">₹ INR - Indian Rupee</SelectItem>
+                    <SelectItem value="USD">$ USD - US Dollar</SelectItem>
+                    <SelectItem value="EUR">€ EUR - Euro</SelectItem>
+                    <SelectItem value="GBP">£ GBP - British Pound</SelectItem>
+                    <SelectItem value="AUD">A$ AUD - Australian Dollar</SelectItem>
+                    <SelectItem value="SGD">S$ SGD - Singapore Dollar</SelectItem>
+                    <SelectItem value="THB">฿ THB - Thai Baht</SelectItem>
+                    <SelectItem value="JPY">¥ JPY - Japanese Yen</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Accommodation */}
               <div className="space-y-2">
                 <Label>Accommodation type</Label>
