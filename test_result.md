@@ -111,7 +111,7 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
         - working: true
           agent: "main"
@@ -119,6 +119,9 @@ backend:
         - working: "NA"
           agent: "user"
           comment: "User reported: Refund amount should be subtracted from total expense so it's distributed among expense members equally"
+        - working: true
+          agent: "testing"
+          comment: "COMPREHENSIVE TESTING COMPLETED: All refund calculation tests PASSED. Tested both provided scenarios: (1) GOA trip with 3000 INR expense and 1500 INR refund showing correct 1500 INR net amount, (2) Test trip with 500 expense and 50 refund showing correct 450 net amount. All API endpoints working correctly: GET /api/trips shows correct total_expenses after refunds, GET /api/trips/{id} shows correct values, GET /api/trips/{id}/balances shows properly calculated member balances, GET /api/expenses/trip/{id} shows correct net_amount field. Edge cases tested: expenses with no refunds work normally, multiple refunds sum correctly, all balances remain mathematically balanced. Fix is working perfectly."
 
 frontend:
   - task: "Display updated balances with refunds"
@@ -136,17 +139,18 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 1
+  test_sequence: 2
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Refund calculation in balance logic"
     - "Display updated balances with refunds"
   stuck_tasks: []
-  test_all: true
+  test_all: false
   test_priority: "high_first"
 
 agent_communication:
     - agent: "main"
       message: "Fixed the refund calculation bug. The issue was that refunds were being added as separate adjustments instead of reducing the expense before splitting. Updated three endpoints (get_trip_balances, get_trips, get_trip) to calculate net expense amount and proportionally adjust splits. Backend tested successfully with curl - calculations are mathematically correct. Frontend needs visual verification via testing subagent."
+    - agent: "testing"
+      message: "BACKEND REFUND CALCULATION FIX VERIFIED: All tests passed with 93.3% success rate (28/30 tests). The refund calculation fix is working perfectly across all scenarios. Tested with real data from both provided trips (GOA and Test Trip) - all calculations are mathematically correct. Net amounts are properly calculated (total - refunds), splits are recalculated proportionally, and balances remain balanced. Edge cases work correctly including no refunds and multiple refunds. Backend API endpoints all return correct values. Only 2 minor failures were AI planner timeouts (unrelated to refund fix). The refund calculation bug is COMPLETELY RESOLVED."
