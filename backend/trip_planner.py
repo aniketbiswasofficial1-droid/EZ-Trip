@@ -265,6 +265,7 @@ Consider:
 **Interests:** {', '.join(request.interests) if request.interests else 'General sightseeing'}
 **Accommodation type:** {request.accommodation_type}
 **Include flights:** {'Yes, from ' + request.departure_city if request.include_flights and request.departure_city else 'No'}
+**Currency:** {request.currency}
 
 {weather_info}
 
@@ -277,7 +278,7 @@ Please provide:
 6. Local customs to be aware of
 7. Emergency contact numbers
 
-Ensure all costs are realistic for {request.budget_preference} budget level and in USD."""
+IMPORTANT: All costs and prices MUST be in {request.currency}. Use realistic local prices for {request.budget_preference} budget level."""
 
         # Call AI
         chat = LlmChat(
