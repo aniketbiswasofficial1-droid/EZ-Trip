@@ -81,6 +81,7 @@ const TripPlanner = () => {
   const [endDate, setEndDate] = useState(addDays(new Date(), 14));
   const [numTravelers, setNumTravelers] = useState(2);
   const [budgetPreference, setBudgetPreference] = useState("moderate");
+  const [currency, setCurrency] = useState("INR"); // Default to INR for India focus
   const [interests, setInterests] = useState([]);
   const [accommodationType, setAccommodationType] = useState("hotel");
   const [includeFlights, setIncludeFlights] = useState(true);
