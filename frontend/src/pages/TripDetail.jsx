@@ -208,14 +208,34 @@ const TripDetail = () => {
   };
 
   const resetExpenseForm = () => {
+    // Auto-select all members for split by default
+    const defaultSplits = trip?.members.map(m => ({ user_id: m.user_id, amount: 0 })) || [];
+    
     setNewExpense({
       description: "",
       total_amount: "",
       currency: trip?.currency || "USD",
       category: "general",
       payers: [],
-      splits: [],
+      splits: defaultSplits,
     });
+  };
+
+  // Auto-calculate equal splits when amount changes or splits change
+  const autoCalculateEqualSplits = (amount, splits) => {
+    if (!amount || splits.length === 0) return splits;
+    const perPerson = parseFloat(amount) / splits.length;
+    return splits.map(s => ({ ...s, amount: perPerson }));
+  };
+
+  // Update splits when total amount changes
+  const handleAmountChange = (value) => {
+    const newSplits = autoCalculateEqualSplits(value, newExpense.splits);
+    setNewExpense(prev => ({
+      ...prev,
+      total_amount: value,
+      splits: newSplits
+    }));
   };
 
   // Handle payer selection
