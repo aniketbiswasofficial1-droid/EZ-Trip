@@ -101,8 +101,12 @@ const TripPlanner = () => {
       newErrors.destination = "Please enter a destination";
     }
 
-    if (!dateRange.from || !dateRange.to) {
+    if (!startDate || !endDate) {
       newErrors.dates = "Please select travel dates";
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      newErrors.dates = "End date must be after start date";
     }
 
     if (includeFlights && !departureCity.trim()) {
@@ -124,8 +128,8 @@ const TripPlanner = () => {
         `${API}/planner/generate`,
         {
           destination,
-          start_date: format(dateRange.from, "yyyy-MM-dd"),
-          end_date: format(dateRange.to, "yyyy-MM-dd"),
+          start_date: format(startDate, "yyyy-MM-dd"),
+          end_date: format(endDate, "yyyy-MM-dd"),
           num_travelers: numTravelers,
           budget_preference: budgetPreference,
           interests,
