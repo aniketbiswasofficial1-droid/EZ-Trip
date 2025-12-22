@@ -750,13 +750,12 @@ const TripDetail = () => {
 
                   <Button
                     type="submit"
-                    className="w-full rounded-full font-bold btn-glow"
+                    className="w-full rounded-full font-bold btn-glow sticky bottom-0"
                     data-testid="submit-expense-btn"
                   >
                     Add Expense
                   </Button>
                 </form>
-              </ScrollArea>
             </DialogContent>
           </Dialog>
         </div>
