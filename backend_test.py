@@ -447,6 +447,290 @@ class SplitEaseAPITester:
 
         return plan_id
 
+    def test_refund_calculation_fix(self):
+        """Test the refund calculation fix comprehensively"""
+        print("\n🔍 Testing Refund Calculation Fix...")
+        
+        if not self.session_token:
+            print("⚠️ Skipping refund calculation tests - no session token")
+            return
+        
+        headers = {
+            'Authorization': f'Bearer {self.session_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Test with existing test data from review request
+        test_scenarios = [
+            {
+                "trip_id": "trip_072802d10446",
+                "session_token": "OVzj8YHuDyeXJwdSt5uqkc9-kgQIHrH0WFHipWueICo",
+                "expected_expense": 3000,
+                "expected_refund": 1500,
+                "expected_net": 1500,
+                "description": "GOA Trip - 3000 INR expense with 1500 INR refund"
+            },
+            {
+                "trip_id": "trip_76cd936d507d", 
+                "session_token": "admin_session_token_001",
+                "expected_expense": 500,
+                "expected_refund": 50,
+                "expected_net": 450,
+                "description": "Test Trip for Expense - 500 expense with 50 refund"
+            }
+        ]
+        
+        for scenario in test_scenarios:
+            print(f"\n  Testing scenario: {scenario['description']}")
+            
+            # Use the specific session token for this test
+            test_headers = {
+                'Authorization': f'Bearer {scenario["session_token"]}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Test 1: GET /api/trips (list view) - check total_expenses and your_balance
+            try:
+                response = requests.get(f"{self.api_url}/trips", headers=test_headers, timeout=10)
+                success = response.status_code == 200
+                details = f"Status: {response.status_code}"
+                
+                if success:
+                    trips = response.json()
+                    target_trip = None
+                    for trip in trips:
+                        if trip.get('trip_id') == scenario['trip_id']:
+                            target_trip = trip
+                            break
+                    
+                    if target_trip:
+                        total_expenses = target_trip.get('total_expenses', 0)
+                        your_balance = target_trip.get('your_balance', 0)
+                        details += f", Total expenses: {total_expenses}, Your balance: {your_balance}"
+                        
+                        # Check if total_expenses reflects net amount after refunds
+                        if abs(total_expenses - scenario['expected_net']) < 0.01:
+                            details += " ✓ Total expenses correct after refunds"
+                        else:
+                            success = False
+                            details += f" ✗ Expected net {scenario['expected_net']}, got {total_expenses}"
+                    else:
+                        success = False
+                        details += f", Trip {scenario['trip_id']} not found"
+                
+                self.log_test(f"Trips List - {scenario['description']}", success, details)
+            except Exception as e:
+                self.log_test(f"Trips List - {scenario['description']}", False, f"Error: {str(e)}")
+            
+            # Test 2: GET /api/trips/{trip_id} (detail view) - check correct values
+            try:
+                response = requests.get(f"{self.api_url}/trips/{scenario['trip_id']}", 
+                                      headers=test_headers, timeout=10)
+                success = response.status_code == 200
+                details = f"Status: {response.status_code}"
+                
+                if success:
+                    trip = response.json()
+                    total_expenses = trip.get('total_expenses', 0)
+                    your_balance = trip.get('your_balance', 0)
+                    details += f", Total expenses: {total_expenses}, Your balance: {your_balance}"
+                    
+                    # Check if values are correct after refund calculation
+                    if abs(total_expenses - scenario['expected_net']) < 0.01:
+                        details += " ✓ Trip detail expenses correct"
+                    else:
+                        success = False
+                        details += f" ✗ Expected net {scenario['expected_net']}, got {total_expenses}"
+                
+                self.log_test(f"Trip Detail - {scenario['description']}", success, details)
+            except Exception as e:
+                self.log_test(f"Trip Detail - {scenario['description']}", False, f"Error: {str(e)}")
+            
+            # Test 3: GET /api/trips/{trip_id}/balances - check all member balances
+            try:
+                response = requests.get(f"{self.api_url}/trips/{scenario['trip_id']}/balances", 
+                                      headers=test_headers, timeout=10)
+                success = response.status_code == 200
+                details = f"Status: {response.status_code}"
+                
+                if success:
+                    balances = response.json()
+                    details += f", Members: {len(balances)}"
+                    
+                    # Check that balances are calculated with net amounts
+                    total_balance = sum(b.get('balance', 0) for b in balances)
+                    details += f", Total balance: {total_balance:.2f}"
+                    
+                    # Total balance should be close to 0 (balanced)
+                    if abs(total_balance) < 0.01:
+                        details += " ✓ Balances are balanced"
+                    else:
+                        details += f" ⚠ Balances not perfectly balanced: {total_balance:.2f}"
+                    
+                    # Show individual balances for debugging
+                    for balance in balances:
+                        details += f", {balance.get('name', 'Unknown')}: {balance.get('balance', 0):.2f}"
+                
+                self.log_test(f"Trip Balances - {scenario['description']}", success, details)
+            except Exception as e:
+                self.log_test(f"Trip Balances - {scenario['description']}", False, f"Error: {str(e)}")
+            
+            # Test 4: GET /api/expenses/trip/{trip_id} - verify net_amount field
+            try:
+                response = requests.get(f"{self.api_url}/expenses/trip/{scenario['trip_id']}", 
+                                      headers=test_headers, timeout=10)
+                success = response.status_code == 200
+                details = f"Status: {response.status_code}"
+                
+                if success:
+                    expenses = response.json()
+                    details += f", Expenses: {len(expenses)}"
+                    
+                    for expense in expenses:
+                        total_amount = expense.get('total_amount', 0)
+                        net_amount = expense.get('net_amount', 0)
+                        refunds = expense.get('refunds', [])
+                        total_refunded = sum(r.get('amount', 0) for r in refunds)
+                        
+                        details += f", Expense: {total_amount}, Refunded: {total_refunded}, Net: {net_amount}"
+                        
+                        # Verify net_amount = total_amount - refunds
+                        expected_net = total_amount - total_refunded
+                        if abs(net_amount - expected_net) < 0.01:
+                            details += " ✓ Net amount correct"
+                        else:
+                            success = False
+                            details += f" ✗ Expected net {expected_net}, got {net_amount}"
+                
+                self.log_test(f"Trip Expenses Net Amount - {scenario['description']}", success, details)
+            except Exception as e:
+                self.log_test(f"Trip Expenses Net Amount - {scenario['description']}", False, f"Error: {str(e)}")
+
+    def test_refund_edge_cases(self):
+        """Test edge cases for refund calculations"""
+        print("\n🔍 Testing Refund Edge Cases...")
+        
+        if not self.session_token:
+            print("⚠️ Skipping refund edge case tests - no session token")
+            return
+        
+        headers = {
+            'Authorization': f'Bearer {self.session_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Create a test trip for edge case testing
+        try:
+            trip_data = {
+                "name": "Refund Edge Case Test Trip",
+                "description": "Testing various refund scenarios",
+                "currency": "USD"
+            }
+            
+            response = requests.post(f"{self.api_url}/trips", json=trip_data, headers=headers, timeout=10)
+            if response.status_code != 200:
+                print("⚠️ Could not create test trip for edge cases")
+                return
+            
+            trip_id = response.json().get('trip_id')
+            print(f"  Created test trip: {trip_id}")
+            
+            # Test Case 1: Expense with no refund (should work normally)
+            expense_data_1 = {
+                "trip_id": trip_id,
+                "description": "No Refund Expense",
+                "total_amount": 100.00,
+                "currency": "USD",
+                "payers": [{"user_id": self.test_user_id, "amount": 100.00}],
+                "splits": [{"user_id": self.test_user_id, "amount": 100.00}]
+            }
+            
+            response = requests.post(f"{self.api_url}/expenses", json=expense_data_1, headers=headers, timeout=10)
+            success = response.status_code == 200
+            details = f"Status: {response.status_code}"
+            if success:
+                expense_1 = response.json()
+                net_amount = expense_1.get('net_amount', 0)
+                if net_amount == 100.00:
+                    details += " ✓ No refund expense correct"
+                else:
+                    success = False
+                    details += f" ✗ Expected 100, got {net_amount}"
+            
+            self.log_test("Edge Case: Expense with no refund", success, details)
+            
+            # Test Case 2: Expense with multiple refunds
+            expense_data_2 = {
+                "trip_id": trip_id,
+                "description": "Multiple Refunds Expense", 
+                "total_amount": 200.00,
+                "currency": "USD",
+                "payers": [{"user_id": self.test_user_id, "amount": 200.00}],
+                "splits": [{"user_id": self.test_user_id, "amount": 200.00}]
+            }
+            
+            response = requests.post(f"{self.api_url}/expenses", json=expense_data_2, headers=headers, timeout=10)
+            if response.status_code == 200:
+                expense_2 = response.json()
+                expense_2_id = expense_2.get('expense_id')
+                
+                # Add first refund
+                refund_1 = {
+                    "expense_id": expense_2_id,
+                    "amount": 30.00,
+                    "reason": "First refund",
+                    "refunded_to": [self.test_user_id]
+                }
+                requests.post(f"{self.api_url}/refunds", json=refund_1, headers=headers, timeout=10)
+                
+                # Add second refund
+                refund_2 = {
+                    "expense_id": expense_2_id,
+                    "amount": 20.00,
+                    "reason": "Second refund", 
+                    "refunded_to": [self.test_user_id]
+                }
+                requests.post(f"{self.api_url}/refunds", json=refund_2, headers=headers, timeout=10)
+                
+                # Check the expense now shows correct net amount
+                response = requests.get(f"{self.api_url}/expenses/{expense_2_id}", headers=headers, timeout=10)
+                success = response.status_code == 200
+                details = f"Status: {response.status_code}"
+                if success:
+                    updated_expense = response.json()
+                    net_amount = updated_expense.get('net_amount', 0)
+                    expected_net = 200.00 - 30.00 - 20.00  # 150.00
+                    if abs(net_amount - expected_net) < 0.01:
+                        details += f" ✓ Multiple refunds correct: {net_amount}"
+                    else:
+                        success = False
+                        details += f" ✗ Expected {expected_net}, got {net_amount}"
+                
+                self.log_test("Edge Case: Multiple refunds", success, details)
+            
+            # Test the trip balances after all operations
+            try:
+                response = requests.get(f"{self.api_url}/trips/{trip_id}/balances", headers=headers, timeout=10)
+                success = response.status_code == 200
+                details = f"Status: {response.status_code}"
+                if success:
+                    balances = response.json()
+                    total_balance = sum(b.get('balance', 0) for b in balances)
+                    details += f", Total balance: {total_balance:.2f}"
+                    
+                    # Should be balanced (close to 0)
+                    if abs(total_balance) < 0.01:
+                        details += " ✓ Edge case balances correct"
+                    else:
+                        details += f" ⚠ Balances not balanced: {total_balance:.2f}"
+                
+                self.log_test("Edge Case: Final balance check", success, details)
+            except Exception as e:
+                self.log_test("Edge Case: Final balance check", False, f"Error: {str(e)}")
+                
+        except Exception as e:
+            self.log_test("Edge Case Setup", False, f"Error: {str(e)}")
+
     def test_weather_api_integration(self):
         """Test weather API integration (Open-Meteo geocoding)"""
         print("\n🔍 Testing Weather API Integration...")
