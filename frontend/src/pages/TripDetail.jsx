@@ -683,6 +683,8 @@ const TripDetail = () => {
                 payers: [],
                 splits: defaultSplits,
               });
+              setMultiplePayersMode(false);
+              setSinglePayer("");
             }
           }}>
             <DialogTrigger asChild>
