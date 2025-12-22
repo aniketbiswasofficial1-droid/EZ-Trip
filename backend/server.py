@@ -820,6 +820,94 @@ async def delete_expense(
     
     return {"message": "Expense deleted"}
 
+class ExpenseUpdate(BaseModel):
+    description: Optional[str] = None
+    total_amount: Optional[float] = None
+    currency: Optional[str] = None
+    payers: Optional[List[ExpensePayer]] = None
+    splits: Optional[List[ExpenseSplit]] = None
+    category: Optional[str] = None
+
+@expenses_router.put("/{expense_id}", response_model=ExpenseResponse)
+async def update_expense(
+    expense_id: str,
+    update: ExpenseUpdate,
+    user: dict = Depends(get_current_user)
+):
+    """Update an expense"""
+    expense = await db.expenses.find_one(
+        {"expense_id": expense_id},
+        {"_id": 0}
+    )
+    
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    
+    # Verify user has access to the trip
+    trip = await db.trips.find_one(
+        {"trip_id": expense["trip_id"], "members.user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    # Build update data
+    update_data = {}
+    if update.description is not None:
+        update_data["description"] = update.description
+    if update.total_amount is not None:
+        update_data["total_amount"] = update.total_amount
+    if update.currency is not None:
+        update_data["currency"] = update.currency
+    if update.payers is not None:
+        update_data["payers"] = [p.model_dump() for p in update.payers]
+    if update.splits is not None:
+        update_data["splits"] = [s.model_dump() for s in update.splits]
+    if update.category is not None:
+        update_data["category"] = update.category
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.expenses.update_one(
+            {"expense_id": expense_id},
+            {"$set": update_data}
+        )
+    
+    # Fetch updated expense
+    updated_expense = await db.expenses.find_one(
+        {"expense_id": expense_id},
+        {"_id": 0}
+    )
+    
+    # Get refunds
+    refunds = await db.refunds.find(
+        {"expense_id": expense_id},
+        {"_id": 0}
+    ).to_list(100)
+    
+    total_refunded = sum(r["amount"] for r in refunds)
+    
+    refund_responses = []
+    for r in refunds:
+        if isinstance(r.get("created_at"), str):
+            r["created_at"] = datetime.fromisoformat(r["created_at"])
+        refund_responses.append(RefundResponse(
+            **r,
+            expense_description=updated_expense["description"]
+        ))
+    
+    if isinstance(updated_expense.get("date"), str):
+        updated_expense["date"] = datetime.fromisoformat(updated_expense["date"])
+    if isinstance(updated_expense.get("created_at"), str):
+        updated_expense["created_at"] = datetime.fromisoformat(updated_expense["created_at"])
+    
+    return ExpenseResponse(
+        **updated_expense,
+        refunds=refund_responses,
+        net_amount=updated_expense["total_amount"] - total_refunded
+    )
+
 # ========================
 # REFUNDS ROUTES
 # ========================
