@@ -1015,6 +1015,72 @@ async def delete_refund(
     
     return {"message": "Refund deleted"}
 
+class RefundUpdate(BaseModel):
+    amount: Optional[float] = None
+    reason: Optional[str] = None
+    refunded_to: Optional[List[str]] = None
+
+@refunds_router.put("/{refund_id}", response_model=RefundResponse)
+async def update_refund(
+    refund_id: str,
+    update: RefundUpdate,
+    user: dict = Depends(get_current_user)
+):
+    """Update a refund"""
+    refund = await db.refunds.find_one(
+        {"refund_id": refund_id},
+        {"_id": 0}
+    )
+    
+    if not refund:
+        raise HTTPException(status_code=404, detail="Refund not found")
+    
+    # Verify user has access to the trip
+    trip = await db.trips.find_one(
+        {"trip_id": refund["trip_id"], "members.user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    # Get expense for response
+    expense = await db.expenses.find_one(
+        {"expense_id": refund["expense_id"]},
+        {"_id": 0}
+    )
+    
+    # Build update data
+    update_data = {}
+    if update.amount is not None:
+        update_data["amount"] = update.amount
+    if update.reason is not None:
+        update_data["reason"] = update.reason
+    if update.refunded_to is not None:
+        update_data["refunded_to"] = update.refunded_to
+    
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.refunds.update_one(
+            {"refund_id": refund_id},
+            {"$set": update_data}
+        )
+    
+    # Fetch updated refund
+    updated_refund = await db.refunds.find_one(
+        {"refund_id": refund_id},
+        {"_id": 0}
+    )
+    
+    if isinstance(updated_refund.get("created_at"), str):
+        updated_refund["created_at"] = datetime.fromisoformat(updated_refund["created_at"])
+    
+    return RefundResponse(
+        **{k: v for k, v in updated_refund.items() if k not in ["created_at", "updated_at"]},
+        expense_description=expense["description"] if expense else "",
+        created_at=updated_refund["created_at"]
+    )
+
 # ========================
 # CURRENCIES
 # ========================
