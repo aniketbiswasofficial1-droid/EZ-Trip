@@ -148,14 +148,15 @@ frontend:
 metadata:
   created_by: "main_agent"
   version: "1.0"
-  test_sequence: 2
+  test_sequence: 3
   run_ui: true
 
 test_plan:
   current_focus:
-    - "Display updated balances with refunds"
+    - "Refund calculation with recipient consideration"
+    - "Real-time balance updates after refund operations"
   stuck_tasks: []
-  test_all: false
+  test_all: true
   test_priority: "high_first"
 
 agent_communication:
@@ -163,3 +164,5 @@ agent_communication:
       message: "Fixed the refund calculation bug. The issue was that refunds were being added as separate adjustments instead of reducing the expense before splitting. Updated three endpoints (get_trip_balances, get_trips, get_trip) to calculate net expense amount and proportionally adjust splits. Backend tested successfully with curl - calculations are mathematically correct. Frontend needs visual verification via testing subagent."
     - agent: "testing"
       message: "BACKEND REFUND CALCULATION FIX VERIFIED: All tests passed with 93.3% success rate (28/30 tests). The refund calculation fix is working perfectly across all scenarios. Tested with real data from both provided trips (GOA and Test Trip) - all calculations are mathematically correct. Net amounts are properly calculated (total - refunds), splits are recalculated proportionally, and balances remain balanced. Edge cases work correctly including no refunds and multiple refunds. Backend API endpoints all return correct values. Only 2 minor failures were AI planner timeouts (unrelated to refund fix). The refund calculation bug is COMPLETELY RESOLVED."
+    - agent: "main"
+      message: "CRITICAL UPDATE: User clarified that WHO receives the refund matters! Updated all three endpoints to treat refund recipient as having negative payment (debit). Now if person B receives a refund, it's subtracted from B's balance (B owes more). Tested with GOA trip: Ritaban received 1500 refund, now owes 2250 instead of 750. Also fixed frontend 'Your balance' not updating in real-time by adding fetchTrip() calls to refund create/update functions."
