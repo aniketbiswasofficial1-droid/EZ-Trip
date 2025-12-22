@@ -168,16 +168,27 @@ class RefundCalculationTester:
             member_data = {"email": "user_b@test.com", "name": "User B"}
             requests.post(f"{self.api_url}/trips/{trip_id}/members", json=member_data, headers=headers, timeout=10)
             
+            # Get actual trip member IDs
+            response = requests.get(f"{self.api_url}/trips/{trip_id}", headers=headers, timeout=10)
+            if response.status_code != 200:
+                self.log_test("Scenario 1: Get Trip", False, f"Status: {response.status_code}")
+                return
+            
+            trip = response.json()
+            trip_members = trip['members']
+            actual_user_a = trip_members[0]['user_id']  # Creator
+            actual_user_b = trip_members[1]['user_id'] if len(trip_members) > 1 else user_b_id
+            
             # Create expense: A pays 3000, split equally between A and B
             expense_data = {
                 "trip_id": trip_id,
                 "description": "Test Expense - A pays 3000",
                 "total_amount": 3000.00,
                 "currency": "USD",
-                "payers": [{"user_id": user_a_id, "amount": 3000.00}],
+                "payers": [{"user_id": actual_user_a, "amount": 3000.00}],
                 "splits": [
-                    {"user_id": user_a_id, "amount": 1500.00},
-                    {"user_id": user_b_id, "amount": 1500.00}
+                    {"user_id": actual_user_a, "amount": 1500.00},
+                    {"user_id": actual_user_b, "amount": 1500.00}
                 ]
             }
             
