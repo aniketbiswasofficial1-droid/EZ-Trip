@@ -204,7 +204,7 @@ class RefundCalculationTester:
                 "expense_id": expense_id,
                 "amount": 1000.00,
                 "reason": "Refund to B",
-                "refunded_to": [user_b_id]
+                "refunded_to": [actual_user_b]
             }
             
             response = requests.post(f"{self.api_url}/refunds", json=refund_data, headers=headers, timeout=10)
@@ -221,8 +221,8 @@ class RefundCalculationTester:
             balances = response.json()
             balance_dict = {b['user_id']: b['balance'] for b in balances}
             
-            a_balance = balance_dict.get(user_a_id, 0)
-            b_balance = balance_dict.get(user_b_id, 0)
+            a_balance = balance_dict.get(actual_user_a, 0)
+            b_balance = balance_dict.get(actual_user_b, 0)
             total_balance = sum(balance_dict.values())
             
             # Expected: A +2000, B -2000, Total: 0
