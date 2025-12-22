@@ -458,6 +458,50 @@ const TripDetail = () => {
     }
   };
 
+  // Handle refund update
+  const handleUpdateRefund = async (e) => {
+    e.preventDefault();
+
+    if (!newRefund.amount || !newRefund.reason || newRefund.refunded_to.length === 0) {
+      toast.error("Please fill in all fields and select recipients");
+      return;
+    }
+
+    try {
+      const payload = {
+        amount: parseFloat(newRefund.amount),
+        reason: newRefund.reason,
+        refunded_to: newRefund.refunded_to,
+      };
+
+      await axios.put(`${API}/refunds/${selectedRefund.refund_id}`, payload, { withCredentials: true });
+
+      toast.success("Refund updated successfully!");
+      setEditRefundOpen(false);
+      setSelectedRefund(null);
+      setSelectedExpense(null);
+      setNewRefund({ amount: "", reason: "", refunded_to: [] });
+      fetchExpenses();
+      fetchBalances();
+      fetchSettlements();
+    } catch (error) {
+      console.error("Error updating refund:", error);
+      toast.error("Failed to update refund");
+    }
+  };
+
+  // Open edit refund dialog
+  const openEditRefund = (refund, expense) => {
+    setSelectedRefund(refund);
+    setSelectedExpense(expense);
+    setNewRefund({
+      amount: refund.amount.toString(),
+      reason: refund.reason,
+      refunded_to: refund.refunded_to,
+    });
+    setEditRefundOpen(true);
+  };
+
   // Handle expense deletion
   const handleDeleteExpense = async (expenseId) => {
     try {
