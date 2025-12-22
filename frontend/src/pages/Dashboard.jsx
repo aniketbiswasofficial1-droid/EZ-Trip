@@ -65,7 +65,19 @@ const Dashboard = () => {
   useEffect(() => {
     fetchTrips();
     fetchCurrencies();
+    checkAdminStatus();
   }, []);
+
+  const checkAdminStatus = async () => {
+    try {
+      const response = await axios.get(`${API}/admin/check`, {
+        withCredentials: true,
+      });
+      setIsAdmin(response.data.is_admin);
+    } catch (error) {
+      setIsAdmin(false);
+    }
+  };
 
   const fetchTrips = async () => {
     try {
