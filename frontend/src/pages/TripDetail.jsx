@@ -1291,6 +1291,218 @@ const TripDetail = () => {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Edit Expense Dialog */}
+        <Dialog open={editExpenseOpen} onOpenChange={(open) => {
+          setEditExpenseOpen(open);
+          if (!open) {
+            setSelectedExpense(null);
+            resetExpenseForm();
+          }
+        }}>
+          <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+            <DialogHeader className="sticky top-0 bg-card z-10 pb-4">
+              <DialogTitle className="font-heading text-2xl">
+                Edit Expense
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateExpense} className="space-y-6 pb-4">
+              {/* Description */}
+              <div className="space-y-2">
+                <Label htmlFor="edit-expense-description">Description</Label>
+                <Input
+                  id="edit-expense-description"
+                  placeholder="Hotel booking, dinner, etc."
+                  value={newExpense.description}
+                  onChange={(e) =>
+                    setNewExpense({ ...newExpense, description: e.target.value })
+                  }
+                  data-testid="edit-expense-description-input"
+                />
+              </div>
+
+              {/* Amount and Currency */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-expense-amount">Amount</Label>
+                  <Input
+                    id="edit-expense-amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={newExpense.total_amount}
+                    onChange={(e) => handleAmountChange(e.target.value)}
+                    data-testid="edit-expense-amount-input"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select
+                    value={newExpense.currency}
+                    onValueChange={(value) =>
+                      setNewExpense({ ...newExpense, currency: value })
+                    }
+                  >
+                    <SelectTrigger data-testid="edit-expense-currency-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencies.map((c) => (
+                        <SelectItem key={c.code} value={c.code}>
+                          {c.symbol} {c.code}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Who Paid - Simplified */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Who paid?</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Multiple payers</span>
+                    <Switch
+                      checked={multiplePayersMode}
+                      onCheckedChange={(checked) => {
+                        setMultiplePayersMode(checked);
+                        if (!checked) {
+                          setSinglePayer("");
+                          setNewExpense(prev => ({ ...prev, payers: [] }));
+                        }
+                      }}
+                      data-testid="edit-multiple-payers-toggle"
+                    />
+                  </div>
+                </div>
+                
+                {!multiplePayersMode ? (
+                  <Select value={singlePayer} onValueChange={setSinglePayer}>
+                    <SelectTrigger data-testid="edit-single-payer-select">
+                      <SelectValue placeholder="Select who paid" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {trip?.members.map((member) => (
+                        <SelectItem key={member.user_id} value={member.user_id}>
+                          <div className="flex items-center gap-2">
+                            <Avatar className="w-6 h-6">
+                              <AvatarImage src={member.picture} />
+                              <AvatarFallback className="text-xs">{member.name.charAt(0)}</AvatarFallback>
+                            </Avatar>
+                            {member.name}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="space-y-2 p-3 bg-secondary/30 rounded-lg border border-primary/20">
+                    <p className="text-xs text-muted-foreground mb-2">Enter amount paid by each person:</p>
+                    {trip?.members.map((member) => {
+                      const payerData = newExpense.payers.find(
+                        (p) => p.user_id === member.user_id
+                      );
+
+                      return (
+                        <div key={member.user_id} className="flex items-center gap-3">
+                          <Avatar className="w-8 h-8">
+                            <AvatarImage src={member.picture} />
+                            <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <span className="flex-1 text-sm">{member.name}</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={payerData?.amount || ""}
+                            onChange={(e) => {
+                              const amount = parseFloat(e.target.value) || 0;
+                              setNewExpense(prev => {
+                                const existing = prev.payers.find(p => p.user_id === member.user_id);
+                                if (existing) {
+                                  return {
+                                    ...prev,
+                                    payers: prev.payers.map(p => 
+                                      p.user_id === member.user_id ? { ...p, amount } : p
+                                    )
+                                  };
+                                } else {
+                                  return {
+                                    ...prev,
+                                    payers: [...prev.payers, { user_id: member.user_id, amount }]
+                                  };
+                                }
+                              });
+                            }}
+                            className="w-24 h-8 text-sm"
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Split Between */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Split between</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={calculateEqualSplits}
+                    className="text-xs text-primary"
+                  >
+                    Split Equally
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {trip?.members.map((member) => {
+                    const isSelected = newExpense.splits.some(
+                      (s) => s.user_id === member.user_id
+                    );
+                    const splitData = newExpense.splits.find(
+                      (s) => s.user_id === member.user_id
+                    );
+
+                    return (
+                      <div
+                        key={member.user_id}
+                        className="flex items-center gap-3 p-3 bg-secondary/50 rounded-lg"
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={(checked) => handleSplitToggle(member, checked)}
+                        />
+                        <Avatar className="w-8 h-8">
+                          <AvatarImage src={member.picture} />
+                          <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <span className="flex-1 text-sm">{member.name}</span>
+                        {isSelected && (
+                          <span className="text-sm font-medium text-primary">
+                            {getCurrencySymbol(newExpense.currency)}
+                            {(splitData?.amount || 0).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Button
+                type="submit"
+                className="w-full rounded-full font-bold btn-glow sticky bottom-0"
+                data-testid="submit-edit-expense-btn"
+              >
+                Update Expense
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );
