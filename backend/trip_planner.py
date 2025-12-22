@@ -1,6 +1,7 @@
 """
 AI Trip Planner Service
 Uses OpenAI GPT-4o for intelligent trip planning with weather, costs, and itinerary generation.
+Includes price comparison across multiple platforms via web search.
 """
 import os
 import httpx
@@ -22,6 +23,7 @@ class TripPlanRequest(BaseModel):
     accommodation_type: str = "hotel"  # hotel, hostel, airbnb, resort
     include_flights: bool = True
     departure_city: Optional[str] = None
+    compare_prices: bool = True  # Enable price comparison
 
 class WeatherData(BaseModel):
     date: str
@@ -29,6 +31,13 @@ class WeatherData(BaseModel):
     temperature_min: float
     precipitation_probability: int
     weather_description: str
+
+class PriceComparison(BaseModel):
+    category: str  # "flights", "hotels", "activities"
+    item_name: str
+    prices: List[Dict[str, Any]]  # [{platform: "Booking.com", price: 120, url: "..."}]
+    best_deal: Dict[str, Any]
+    savings_potential: float
 
 class DayItinerary(BaseModel):
     day: int
@@ -48,6 +57,7 @@ class CostBreakdown(BaseModel):
     total_per_person: float
     total_group: float
     currency: str
+    price_comparisons: List[PriceComparison] = []
 
 class TripPlanResponse(BaseModel):
     destination: str
