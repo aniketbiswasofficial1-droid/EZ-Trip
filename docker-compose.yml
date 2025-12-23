@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # MongoDB Service
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - eztrip-network
+
+  # Backend API Service
+  backend:
+    build: ./backend
+    container_name: eztrip-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=eztrip
+      - CORS_ORIGINS=http://localhost:3000
+      - OPENAI_API_KEY=${OPENAI_API_KEY} # Needs to be set in .env or shell
+    depends_on:
+      - mongodb
+    volumes:
+      - ./backend:/app # Syncs code for hot-reloading
+    networks:
+      - eztrip-network
+
+  # Frontend React Service
+  frontend:
+    build: ./frontend
+    container_name: eztrip-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true # Helps with hot-reload in Docker
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules # Prevent overwriting node_modules
+    stdin_open: true # Required for react-scripts
+    tty: true
+    networks:
+      - eztrip-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  eztrip-network:
+    driver: bridge

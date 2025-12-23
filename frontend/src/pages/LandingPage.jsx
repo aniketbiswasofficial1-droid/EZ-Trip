@@ -1,7 +1,8 @@
 import { useAuth } from "@/App";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import AuthModal from "@/components/AuthModal";
 import { 
   Receipt, 
   Users, 
@@ -14,14 +15,21 @@ import {
 } from "lucide-react";
 
 const LandingPage = () => {
-  const { user, login, loading } = useAuth();
+  const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [initialAuthTab, setInitialAuthTab] = useState("login"); // 'login' or 'register'
 
   useEffect(() => {
     if (!loading && user) {
       navigate('/dashboard');
     }
   }, [user, loading, navigate]);
+
+  const openAuth = (tab) => {
+    setInitialAuthTab(tab);
+    setIsAuthOpen(true);
+  };
 
   const features = [
     {
@@ -52,7 +60,7 @@ const LandingPage = () => {
     {
       icon: Shield,
       title: "Secure & Private",
-      description: "Google sign-in for security. Your financial data stays safe and private."
+      description: "Your financial data stays safe and private."
     }
   ];
 
@@ -65,13 +73,22 @@ const LandingPage = () => {
             <Wallet className="w-8 h-8 text-primary" />
             <span className="font-heading text-xl font-bold tracking-tight">EZ Trip</span>
           </div>
-          <Button 
-            onClick={login}
-            className="rounded-full font-bold tracking-wide btn-glow"
-            data-testid="header-login-btn"
-          >
-            Sign in with Google
-          </Button>
+          
+          <div className="flex items-center gap-4">
+            <Button 
+              variant="ghost"
+              onClick={() => openAuth('login')}
+              className="font-bold hover:text-primary"
+            >
+              Log In
+            </Button>
+            <Button 
+              onClick={() => openAuth('register')}
+              className="rounded-full font-bold tracking-wide btn-glow"
+            >
+              Sign Up
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -99,10 +116,9 @@ const LandingPage = () => {
               
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button 
-                  onClick={login}
+                  onClick={() => openAuth('register')}
                   size="lg"
                   className="rounded-full font-bold tracking-wide btn-glow text-lg px-8 py-6"
-                  data-testid="hero-get-started-btn"
                 >
                   Get Started Free
                   <ArrowRight className="w-5 h-5 ml-2" />
@@ -122,7 +138,7 @@ const LandingPage = () => {
                 <div className="w-px h-10 bg-border"></div>
                 <div>
                   <p className="text-2xl font-heading font-bold text-primary">Secure</p>
-                  <p className="text-sm text-muted-foreground">Google Auth</p>
+                  <p className="text-sm text-muted-foreground">Private</p>
                 </div>
               </div>
             </div>
@@ -242,10 +258,9 @@ const LandingPage = () => {
             Join thousands of travelers who trust EZ Trip for fair and easy expense splitting.
           </p>
           <Button 
-            onClick={login}
+            onClick={() => openAuth('register')}
             size="lg"
             className="rounded-full font-bold tracking-wide btn-glow text-lg px-8 py-6"
-            data-testid="cta-get-started-btn"
           >
             Start Splitting Now
             <ArrowRight className="w-5 h-5 ml-2" />
@@ -265,6 +280,13 @@ const LandingPage = () => {
           </p>
         </div>
       </footer>
+
+      {/* Auth Modal - Pass the initial tab state if your AuthModal supports it */}
+      <AuthModal 
+        isOpen={isAuthOpen} 
+        onClose={() => setIsAuthOpen(false)} 
+        defaultTab={initialAuthTab}
+      />
     </div>
   );
 };

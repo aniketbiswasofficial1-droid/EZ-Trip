@@ -27,6 +27,7 @@ export const useAuth = () => {
 };
 
 // Auth Provider
+
 const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,10 +45,42 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  // Existing Google Login
   const login = () => {
-    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
     const redirectUrl = window.location.origin + '/dashboard';
     window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+  };
+
+  // NEW: Email/Password Login
+  const loginWithPassword = async (email, password) => {
+    try {
+      const response = await axios.post(`${API}/auth/login`, 
+        { email, password },
+        { withCredentials: true }
+      );
+      setUser(response.data);
+      toast.success("Welcome back!");
+      return response.data;
+    } catch (error) {
+      console.error("Login error:", error);
+      throw error; // Re-throw to handle in UI
+    }
+  };
+
+  // NEW: Registration
+  const register = async (name, email, password) => {
+    try {
+      const response = await axios.post(`${API}/auth/register`, 
+        { name, email, password },
+        { withCredentials: true }
+      );
+      setUser(response.data);
+      toast.success("Account created successfully!");
+      return response.data;
+    } catch (error) {
+      console.error("Registration error:", error);
+      throw error;
+    }
   };
 
   const logout = async () => {
@@ -65,7 +98,16 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading, login, logout, checkAuth }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      setUser, 
+      loading, 
+      login, 
+      loginWithPassword, 
+      register, 
+      logout, 
+      checkAuth 
+    }}>
       {children}
     </AuthContext.Provider>
   );

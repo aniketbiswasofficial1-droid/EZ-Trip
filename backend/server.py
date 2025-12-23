@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
+# Add this with your other imports
+from passlib.context import CryptContext
 import uuid
 from datetime import datetime, timezone, timedelta
 import httpx
@@ -194,58 +196,50 @@ async def get_current_user(request: Request) -> dict:
 # AUTH ROUTES
 # ========================
 
-@auth_router.post("/session")
-async def create_session(request: Request, response: Response):
-    """Exchange session_id for session_token"""
-    body = await request.json()
-    session_id = body.get("session_id")
-    
-    if not session_id:
-        raise HTTPException(status_code=400, detail="session_id required")
-    
-    # Call Emergent auth to get user data
-    async with httpx.AsyncClient() as client_http:
-        auth_response = await client_http.get(
-            "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data",
-            headers={"X-Session-ID": session_id}
-        )
-        
-        if auth_response.status_code != 200:
-            raise HTTPException(status_code=401, detail="Invalid session_id")
-        
-        user_data = auth_response.json()
-    
+# Password hashing configuration
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+class UserRegister(BaseModel):
+    email: str
+    password: str
+    name: str
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+@auth_router.post("/register")
+async def register(user_data: UserRegister, response: Response):
+    """Register a new user manually"""
     # Check if user exists
-    existing_user = await db.users.find_one(
-        {"email": user_data["email"]},
-        {"_id": 0}
-    )
-    
+    existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
-        user_id = existing_user["user_id"]
-        # Update user info
-        await db.users.update_one(
-            {"user_id": user_id},
-            {"$set": {
-                "name": user_data["name"],
-                "picture": user_data.get("picture")
-            }}
-        )
-    else:
-        # Create new user
-        user_id = f"user_{uuid.uuid4().hex[:12]}"
-        new_user = {
-            "user_id": user_id,
-            "email": user_data["email"],
-            "name": user_data["name"],
-            "picture": user_data.get("picture"),
-            "default_currency": "USD",
-            "created_at": datetime.now(timezone.utc).isoformat()
-        }
-        await db.users.insert_one(new_user)
+        raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create session
-    session_token = user_data.get("session_token", f"session_{uuid.uuid4().hex}")
+    # Create new user
+    user_id = f"user_{uuid.uuid4().hex[:12]}"
+    hashed_password = get_password_hash(user_data.password)
+    
+    new_user = {
+        "user_id": user_id,
+        "email": user_data.email,
+        "password_hash": hashed_password, # Store hash, not plain password
+        "name": user_data.name,
+        "picture": f"https://api.dicebear.com/7.x/initials/svg?seed={user_data.name}", # Auto-generate avatar
+        "default_currency": "USD",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.users.insert_one(new_user)
+    
+    # Create session immediately
+    session_token = f"session_{uuid.uuid4().hex}"
     expires_at = datetime.now(timezone.utc) + timedelta(days=7)
     
     await db.user_sessions.insert_one({
@@ -260,18 +254,51 @@ async def create_session(request: Request, response: Response):
         key="session_token",
         value=session_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=True, # Set to False if testing on http://localhost without https
+        samesite="lax", # Relaxed for local dev
         path="/",
         max_age=7 * 24 * 60 * 60
     )
     
-    user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
-    return user
+    return {"user_id": user_id, "name": new_user["name"], "email": new_user["email"]}
+
+@auth_router.post("/login")
+async def login(login_data: UserLogin, response: Response):
+    """Login with email and password"""
+    user = await db.users.find_one({"email": login_data.email})
+    
+    if not user or not verify_password(login_data.password, user.get("password_hash", "")):
+        raise HTTPException(status_code=401, detail="Incorrect email or password")
+    
+    # Create session
+    session_token = f"session_{uuid.uuid4().hex}"
+    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    
+    await db.user_sessions.insert_one({
+        "user_id": user["user_id"],
+        "session_token": session_token,
+        "expires_at": expires_at.isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    
+    # Set cookie
+    response.set_cookie(
+        key="session_token",
+        value=session_token,
+        httponly=True,
+        secure=True, # Set to False if testing on http://localhost without https
+        samesite="lax",
+        path="/",
+        max_age=7 * 24 * 60 * 60
+    )
+    
+    return {"user_id": user["user_id"], "name": user["name"], "email": user["email"]}
 
 @auth_router.get("/me")
 async def get_me(user: dict = Depends(get_current_user)):
     """Get current authenticated user"""
+    # Don't send password hash back
+    user.pop("password_hash", None)
     return user
 
 @auth_router.post("/logout")
@@ -286,7 +313,7 @@ async def logout(request: Request, response: Response):
         key="session_token",
         path="/",
         secure=True,
-        samesite="none"
+        samesite="lax"
     )
     
     return {"message": "Logged out"}
@@ -309,6 +336,9 @@ async def update_user(
         {"user_id": user["user_id"]},
         {"_id": 0}
     )
+    if updated_user:
+        updated_user.pop("password_hash", None)
+        
     return updated_user
 
 # ========================
