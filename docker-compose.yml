@@ -20,12 +20,12 @@ services:
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=eztrip
-      - CORS_ORIGINS=http://localhost:3000
-      - OPENAI_API_KEY=${OPENAI_API_KEY} # Needs to be set in .env or shell
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     depends_on:
       - mongodb
     volumes:
-      - ./backend:/app # Syncs code for hot-reloading
+      - ./backend:/app
     networks:
       - eztrip-network
 
@@ -36,14 +36,15 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:8000
-      - WATCHPACK_POLLING=true # Helps with hot-reload in Docker
+      # CHANGED: Renamed from REACT_APP_API_URL to REACT_APP_BACKEND_URL to match App.js
+      - REACT_APP_BACKEND_URL=http://localhost:8000
+      - WATCHPACK_POLLING=true
     depends_on:
       - backend
     volumes:
       - ./frontend:/app
-      - /app/node_modules # Prevent overwriting node_modules
-    stdin_open: true # Required for react-scripts
+      - /app/node_modules
+    stdin_open: true
     tty: true
     networks:
       - eztrip-network

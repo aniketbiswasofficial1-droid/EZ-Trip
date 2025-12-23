@@ -8,9 +8,9 @@ import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional, Dict, Any
-# Add this with your other imports
-from passlib.context import CryptContext
+import bcrypt
 import uuid
+import re  # Required for password validation
 from datetime import datetime, timezone, timedelta
 import httpx
 
@@ -18,12 +18,28 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/eztrip')
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[os.environ.get('DB_NAME', 'eztrip_db')]
 
 # Create the main app
 app = FastAPI()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# GLOBAL ERROR HANDLER
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global error: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server Error: {str(exc)}"}
+    )
 
 # Create routers
 api_router = APIRouter(prefix="/api")
@@ -34,12 +50,26 @@ refunds_router = APIRouter(prefix="/refunds")
 planner_router = APIRouter(prefix="/planner")
 admin_router = APIRouter(prefix="/admin")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# ========================
+# CORS CONFIGURATION
+# ========================
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173"
+]
+
+if os.environ.get('CORS_ORIGINS'):
+    origins.extend(os.environ.get('CORS_ORIGINS').split(','))
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_credentials=True,
+    allow_origins=origins,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
-logger = logging.getLogger(__name__)
 
 # ========================
 # PYDANTIC MODELS
@@ -196,14 +226,34 @@ async def get_current_user(request: Request) -> dict:
 # AUTH ROUTES
 # ========================
 
-# Password hashing configuration
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+# NEW: Helper functions using bcrypt directly
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    if not hashed_password:
+        return False
+    if isinstance(plain_password, str):
+        plain_password = plain_password.encode('utf-8')
+    if isinstance(hashed_password, str):
+        hashed_password = hashed_password.encode('utf-8')
+    try:
+        return bcrypt.checkpw(plain_password, hashed_password)
+    except ValueError:
+        return False
 
 def get_password_hash(password):
-    return pwd_context.hash(password)
+    if isinstance(password, str):
+        password = password.encode('utf-8')
+    return bcrypt.hashpw(password, bcrypt.gensalt()).decode('utf-8')
+
+# NEW: Password Validation
+def validate_strong_password(password: str):
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+    if not re.search(r"[a-zA-Z]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one letter")
+    if not re.search(r"\d", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one number")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        raise HTTPException(status_code=400, detail="Password must contain at least one special character")
 
 class UserRegister(BaseModel):
     email: str
@@ -217,50 +267,60 @@ class UserLogin(BaseModel):
 @auth_router.post("/register")
 async def register(user_data: UserRegister, response: Response):
     """Register a new user manually"""
+    
+    # Validate password strength
+    validate_strong_password(user_data.password)
+
     # Check if user exists
-    existing_user = await db.users.find_one({"email": user_data.email})
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    
-    # Create new user
-    user_id = f"user_{uuid.uuid4().hex[:12]}"
-    hashed_password = get_password_hash(user_data.password)
-    
-    new_user = {
-        "user_id": user_id,
-        "email": user_data.email,
-        "password_hash": hashed_password, # Store hash, not plain password
-        "name": user_data.name,
-        "picture": f"https://api.dicebear.com/7.x/initials/svg?seed={user_data.name}", # Auto-generate avatar
-        "default_currency": "USD",
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    
-    await db.users.insert_one(new_user)
-    
-    # Create session immediately
-    session_token = f"session_{uuid.uuid4().hex}"
-    expires_at = datetime.now(timezone.utc) + timedelta(days=7)
-    
-    await db.user_sessions.insert_one({
-        "user_id": user_id,
-        "session_token": session_token,
-        "expires_at": expires_at.isoformat(),
-        "created_at": datetime.now(timezone.utc).isoformat()
-    })
-    
-    # Set cookie
-    response.set_cookie(
-        key="session_token",
-        value=session_token,
-        httponly=True,
-        secure=True, # Set to False if testing on http://localhost without https
-        samesite="lax", # Relaxed for local dev
-        path="/",
-        max_age=7 * 24 * 60 * 60
-    )
-    
-    return {"user_id": user_id, "name": new_user["name"], "email": new_user["email"]}
+    try:
+        existing_user = await db.users.find_one({"email": user_data.email})
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Create new user
+        user_id = f"user_{uuid.uuid4().hex[:12]}"
+        hashed_password = get_password_hash(user_data.password)
+        
+        new_user = {
+            "user_id": user_id,
+            "email": user_data.email,
+            "password_hash": hashed_password, 
+            "name": user_data.name,
+            "picture": f"https://api.dicebear.com/7.x/initials/svg?seed={user_data.name}", 
+            "default_currency": "USD",
+            "created_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+        await db.users.insert_one(new_user)
+        
+        # Create session immediately
+        session_token = f"session_{uuid.uuid4().hex}"
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        
+        await db.user_sessions.insert_one({
+            "user_id": user_id,
+            "session_token": session_token,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Set cookie
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=False,  # Set False for localhost
+            samesite="lax",
+            path="/",
+            max_age=7 * 24 * 60 * 60
+        )
+        
+        return {"user_id": user_id, "name": new_user["name"], "email": new_user["email"]}
+    except Exception as e:
+        logger.error(f"Registration error: {e}")
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
 @auth_router.post("/login")
 async def login(login_data: UserLogin, response: Response):
@@ -286,7 +346,7 @@ async def login(login_data: UserLogin, response: Response):
         key="session_token",
         value=session_token,
         httponly=True,
-        secure=True, # Set to False if testing on http://localhost without https
+        secure=False, # Set False for localhost
         samesite="lax",
         path="/",
         max_age=7 * 24 * 60 * 60
@@ -312,7 +372,7 @@ async def logout(request: Request, response: Response):
     response.delete_cookie(
         key="session_token",
         path="/",
-        secure=True,
+        secure=False,
         samesite="lax"
     )
     

@@ -45,10 +45,9 @@ const AuthProvider = ({ children }) => {
     }
   };
 
-  // Existing Google Login
+  // Google Login Removed as requested
   const login = () => {
-    const redirectUrl = window.location.origin + '/dashboard';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    toast.info("Google login is currently disabled.");
   };
 
   // NEW: Email/Password Login
