@@ -114,6 +114,10 @@ const TripPlanner = () => {
       newErrors.departureCity = "Please enter your departure city";
     }
 
+    if (!numTravelers || numTravelers < 1) {
+      newErrors.numTravelers = "Please enter at least 1 traveler";
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       toast.error(Object.values(newErrors)[0]);
@@ -131,7 +135,7 @@ const TripPlanner = () => {
           destination,
           start_date: format(startDate, "yyyy-MM-dd"),
           end_date: format(endDate, "yyyy-MM-dd"),
-          num_travelers: numTravelers,
+          num_travelers: Number(numTravelers) || 1,
           budget_preference: budgetPreference,
           currency: currency,
           interests,
@@ -332,9 +336,13 @@ const TripPlanner = () => {
                   <Input
                     type="number"
                     min={1}
-                    max={20}
+                    max={50}
                     value={numTravelers}
-                    onChange={(e) => setNumTravelers(parseInt(e.target.value) || 1)}
+                    onChange={(e) => {
+                        const val = e.target.value;
+                        // If empty, set to empty string. Otherwise, parse as integer.
+                        setNumTravelers(val === "" ? "" : parseInt(val));
+                       }}
                     className="w-24 h-12"
                     data-testid="travelers-input"
                   />
