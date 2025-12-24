@@ -13,6 +13,7 @@ import uuid
 import re  # Required for password validation
 from datetime import datetime, timezone, timedelta
 import httpx
+from trip_planner import trip_planner, TripPlanRequest, TripPlanResponse
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1772,6 +1773,56 @@ async def check_admin_status(user: dict = Depends(get_current_user)):
     """Check if current user is admin"""
     admin_doc = await db.admins.find_one({"user_id": user["user_id"]}, {"_id": 0})
     return {"is_admin": admin_doc is not None}
+
+# ========================
+# TRIP PLANNER ROUTES
+# ========================
+
+@planner_router.post("/generate", response_model=TripPlanResponse)
+async def generate_trip_plan(
+    request: TripPlanRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Generate a trip plan using AI"""
+    try:
+        plan = await trip_planner.generate_trip_plan(request, user["user_id"])
+        return plan
+    except Exception as e:
+        logger.error(f"Trip generation error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@planner_router.post("/save")
+async def save_trip_plan(
+    plan: TripPlanResponse,
+    user: dict = Depends(get_current_user)
+):
+    """Save a generated trip plan"""
+    try:
+        plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+        plan_doc = plan.model_dump()
+        plan_doc["plan_id"] = plan_id
+        plan_doc["user_id"] = user["user_id"]
+        plan_doc["created_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await db.trip_plans.insert_one(plan_doc)
+        
+        return {"message": "Trip plan saved successfully", "plan_id": plan_id}
+    except Exception as e:
+        logger.error(f"Trip save error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save trip plan")
+
+@planner_router.get("/plans")
+async def get_user_plans(user: dict = Depends(get_current_user)):
+    """Get all saved trip plans for the current user"""
+    try:
+        plans = await db.trip_plans.find(
+            {"user_id": user["user_id"]},
+            {"_id": 0}
+        ).sort("created_at", -1).to_list(100)
+        return plans
+    except Exception as e:
+        logger.error(f"Error fetching trip plans: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch trip plans")
 
 # ========================
 # INCLUDE ROUTERS

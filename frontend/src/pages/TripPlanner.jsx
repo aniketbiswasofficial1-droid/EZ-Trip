@@ -39,6 +39,8 @@ import {
   Calendar as CalendarIcon,
   Users,
   Plane,
+  Train,
+  Bus,
   Hotel,
   Utensils,
   Activity,
@@ -69,12 +71,12 @@ const INTERESTS = [
 const TripPlanner = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
-  
+
   // Form state
   const [destination, setDestination] = useState("");
   const [startDate, setStartDate] = useState(addDays(new Date(), 7));
@@ -84,7 +86,8 @@ const TripPlanner = () => {
   const [currency, setCurrency] = useState("INR"); // Default to INR for India focus
   const [interests, setInterests] = useState([]);
   const [accommodationType, setAccommodationType] = useState("hotel");
-  const [includeFlights, setIncludeFlights] = useState(true);
+  const [departureTransport, setDepartureTransport] = useState("flight");
+  const [returnTransport, setReturnTransport] = useState("flight");
   const [departureCity, setDepartureCity] = useState("");
 
   const handleInterestToggle = (interestId) => {
@@ -97,7 +100,7 @@ const TripPlanner = () => {
 
   const handleGeneratePlan = async () => {
     const newErrors = {};
-    
+
     if (!destination.trim()) {
       newErrors.destination = "Please enter a destination";
     }
@@ -110,7 +113,7 @@ const TripPlanner = () => {
       newErrors.dates = "End date must be after start date";
     }
 
-    if (includeFlights && !departureCity.trim()) {
+    if ((departureTransport !== "none" || returnTransport !== "none") && !departureCity.trim()) {
       newErrors.departureCity = "Please enter your departure city";
     }
 
@@ -123,7 +126,7 @@ const TripPlanner = () => {
       toast.error(Object.values(newErrors)[0]);
       return;
     }
-    
+
     setErrors({});
     setLoading(true);
     setPlan(null);
@@ -140,8 +143,9 @@ const TripPlanner = () => {
           currency: currency,
           interests,
           accommodation_type: accommodationType,
-          include_flights: includeFlights,
-          departure_city: includeFlights ? departureCity : null,
+          departure_transport: departureTransport,
+          return_transport: returnTransport,
+          departure_city: (departureTransport !== "none" || returnTransport !== "none") ? departureCity : null,
         },
         { withCredentials: true }
       );
@@ -250,7 +254,7 @@ const TripPlanner = () => {
                     value={destination}
                     onChange={(e) => {
                       setDestination(e.target.value);
-                      if (errors.destination) setErrors({...errors, destination: null});
+                      if (errors.destination) setErrors({ ...errors, destination: null });
                     }}
                     className={`pl-10 h-12 ${errors.destination ? 'border-destructive' : ''}`}
                     data-testid="destination-input"
@@ -339,10 +343,10 @@ const TripPlanner = () => {
                     max={50}
                     value={numTravelers}
                     onChange={(e) => {
-                        const val = e.target.value;
-                        // If empty, set to empty string. Otherwise, parse as integer.
-                        setNumTravelers(val === "" ? "" : parseInt(val));
-                       }}
+                      const val = e.target.value;
+                      // If empty, set to empty string. Otherwise, parse as integer.
+                      setNumTravelers(val === "" ? "" : parseInt(val));
+                    }}
                     className="w-24 h-12"
                     data-testid="travelers-input"
                   />
@@ -403,17 +407,40 @@ const TripPlanner = () => {
                 </Select>
               </div>
 
-              {/* Flights */}
+              {/* Transport Selection */}
               <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <Checkbox
-                    checked={includeFlights}
-                    onCheckedChange={setIncludeFlights}
-                    data-testid="include-flights-checkbox"
-                  />
-                  <Label className="cursor-pointer">Include flight estimates</Label>
+                <Label>Transportation</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Departure Transport</Label>
+                    <Select value={departureTransport} onValueChange={setDepartureTransport}>
+                      <SelectTrigger className="h-12" data-testid="departure-transport-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flight">✈️ Flight</SelectItem>
+                        <SelectItem value="train">🚆 Train</SelectItem>
+                        <SelectItem value="bus">🚌 Bus</SelectItem>
+                        <SelectItem value="none">No Transport</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Return Transport</Label>
+                    <Select value={returnTransport} onValueChange={setReturnTransport}>
+                      <SelectTrigger className="h-12" data-testid="return-transport-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="flight">✈️ Flight</SelectItem>
+                        <SelectItem value="train">🚆 Train</SelectItem>
+                        <SelectItem value="bus">🚌 Bus</SelectItem>
+                        <SelectItem value="none">No Transport</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                {includeFlights && (
+                {(departureTransport !== "none" || returnTransport !== "none") && (
                   <div className="relative animate-fade-in">
                     <Plane className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                     <Input
@@ -421,7 +448,7 @@ const TripPlanner = () => {
                       value={departureCity}
                       onChange={(e) => {
                         setDepartureCity(e.target.value);
-                        if (errors.departureCity) setErrors({...errors, departureCity: null});
+                        if (errors.departureCity) setErrors({ ...errors, departureCity: null });
                       }}
                       className={`pl-10 h-12 ${errors.departureCity ? 'border-destructive' : ''}`}
                       data-testid="departure-city-input"
@@ -445,11 +472,10 @@ const TripPlanner = () => {
                         key={interest.id}
                         type="button"
                         onClick={() => handleInterestToggle(interest.id)}
-                        className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
-                          isSelected
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:border-primary/50"
-                        }`}
+                        className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${isSelected
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border hover:border-primary/50"
+                          }`}
                         data-testid={`interest-${interest.id}`}
                       >
                         <Icon className="w-4 h-4" />
@@ -539,16 +565,17 @@ const TripPlanner = () => {
                 {/* Cost Summary */}
                 <div className="bg-card border border-border rounded-xl p-6">
                   <h3 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
-                    <DollarSign className="w-5 h-5 text-primary" />
-                    Cost Estimate
+                    <span className="text-2xl">{getCurrencySymbol(plan.cost_breakdown.currency)}</span>
+                    Cost Estimate (Per Person)
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
                     {[
-                      { label: "Flights", value: plan.cost_breakdown.flights, icon: Plane },
+                      { label: "Departure", value: plan.cost_breakdown.departure_transport, icon: Plane },
+                      { label: "Return", value: plan.cost_breakdown.return_transport, icon: Plane },
                       { label: "Accommodation", value: plan.cost_breakdown.accommodation, icon: Hotel },
                       { label: "Food", value: plan.cost_breakdown.food, icon: Utensils },
                       { label: "Activities", value: plan.cost_breakdown.activities, icon: Activity },
-                      { label: "Transport", value: plan.cost_breakdown.transportation, icon: Car },
+                      { label: "Local Transport", value: plan.cost_breakdown.local_transportation, icon: Car },
                       { label: "Other", value: plan.cost_breakdown.miscellaneous, icon: Package },
                     ].map((item) => (
                       <div key={item.label} className="p-3 bg-secondary/50 rounded-lg">
@@ -581,14 +608,100 @@ const TripPlanner = () => {
                   </div>
                 </div>
 
+                {/* Transport Details */}
+                {(plan.departure_transport_details || plan.return_transport_details) && (
+                  <div className="grid md:grid-cols-2 gap-4 mt-6">
+                    {plan.departure_transport_details && (
+                      <div className="bg-card border border-border rounded-xl p-6">
+                        <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
+                          <Plane className="w-5 h-5 text-primary" />
+                          Departure Transport
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Type</span>
+                            <span className="font-medium capitalize">{plan.departure_transport_details.transport_type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cost</span>
+                            <span className="font-medium text-primary">
+                              {getCurrencySymbol(plan.cost_breakdown.currency)}{plan.departure_transport_details.cost.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Duration</span>
+                            <span className="font-medium">{plan.departure_transport_details.duration}</span>
+                          </div>
+                          {plan.departure_transport_details.provider && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Provider</span>
+                              <span className="font-medium">{plan.departure_transport_details.provider}</span>
+                            </div>
+                          )}
+                          {(plan.departure_transport_details.departure_time || plan.departure_transport_details.arrival_time) && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Times</span>
+                              <span className="font-medium text-sm">
+                                {plan.departure_transport_details.departure_time} → {plan.departure_transport_details.arrival_time}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {plan.return_transport_details && (
+                      <div className="bg-card border border-border rounded-xl p-6">
+                        <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
+                          <Plane className="w-5 h-5 text-primary" />
+                          Return Transport
+                        </h4>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Type</span>
+                            <span className="font-medium capitalize">{plan.return_transport_details.transport_type}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Cost</span>
+                            <span className="font-medium text-primary">
+                              {getCurrencySymbol(plan.cost_breakdown.currency)}{plan.return_transport_details.cost.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Duration</span>
+                            <span className="font-medium">{plan.return_transport_details.duration}</span>
+                          </div>
+                          {plan.return_transport_details.provider && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Provider</span>
+                              <span className="font-medium">{plan.return_transport_details.provider}</span>
+                            </div>
+                          )}
+                          {(plan.return_transport_details.departure_time || plan.return_transport_details.arrival_time) && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Times</span>
+                              <span className="font-medium text-sm">
+                                {plan.return_transport_details.departure_time} → {plan.return_transport_details.arrival_time}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Tabs for Details */}
-                <Tabs defaultValue="itinerary" className="space-y-4">
-                  <TabsList className="bg-secondary/50 p-1 rounded-full w-full grid grid-cols-5">
-                    <TabsTrigger value="itinerary" className="rounded-full text-xs sm:text-sm">
-                      Itinerary
-                    </TabsTrigger>
+                <Tabs defaultValue="prices" className="space-y-4">
+                  <TabsList className="bg-secondary/50 p-1 rounded-full w-full grid grid-cols-6">
                     <TabsTrigger value="prices" className="rounded-full text-xs sm:text-sm">
                       Prices
+                    </TabsTrigger>
+                    <TabsTrigger value="itinerary" className="rounded-full text-xs sm:text-sm">
+                      Day Plan
+                    </TabsTrigger>
+                    <TabsTrigger value="activities" className="rounded-full text-xs sm:text-sm">
+                      Activities
                     </TabsTrigger>
                     <TabsTrigger value="tips" className="rounded-full text-xs sm:text-sm">
                       Tips
@@ -675,13 +788,13 @@ const TripPlanner = () => {
                     <div className="space-y-4">
                       <div className="bg-card border border-border rounded-xl p-6">
                         <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
-                          <DollarSign className="w-5 h-5 text-primary" />
+                          <span className="text-xl">{getCurrencySymbol(plan.cost_breakdown.currency)}</span>
                           Price Comparison Across Platforms
                         </h4>
                         <p className="text-sm text-muted-foreground mb-6">
                           Compare prices from multiple booking platforms to find the best deals
                         </p>
-                        
+
                         {plan.cost_breakdown.price_comparisons && plan.cost_breakdown.price_comparisons.length > 0 ? (
                           <div className="space-y-6">
                             {plan.cost_breakdown.price_comparisons.map((comparison, idx) => (
@@ -697,16 +810,15 @@ const TripPlanner = () => {
                                     </span>
                                   )}
                                 </div>
-                                
+
                                 <div className="grid gap-2">
                                   {comparison.prices.map((price, pidx) => {
                                     const isBestDeal = comparison.best_deal?.platform === price.platform;
                                     return (
-                                      <div 
+                                      <div
                                         key={pidx}
-                                        className={`flex items-center justify-between p-3 rounded-lg ${
-                                          isBestDeal ? 'bg-primary/10 border border-primary/30' : 'bg-background'
-                                        }`}
+                                        className={`flex items-center justify-between p-3 rounded-lg ${isBestDeal ? 'bg-primary/10 border border-primary/30' : 'bg-background'
+                                          }`}
                                       >
                                         <div className="flex items-center gap-3">
                                           {isBestDeal && (
@@ -715,15 +827,20 @@ const TripPlanner = () => {
                                             </span>
                                           )}
                                           <span className="font-medium">{price.platform}</span>
+                                          {price.duration && (
+                                            <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded-full">
+                                              ⏱️ {price.duration}
+                                            </span>
+                                          )}
                                         </div>
                                         <div className="flex items-center gap-3">
                                           <span className={`font-heading text-lg font-bold ${isBestDeal ? 'text-primary' : ''}`}>
-                                            {getCurrencySymbol(plan.cost_breakdown.currency)}{price.price}
+                                            {getCurrencySymbol(plan.cost_breakdown.currency)}{price.price.toLocaleString()}
                                           </span>
                                           {price.url && (
-                                            <a 
-                                              href={price.url} 
-                                              target="_blank" 
+                                            <a
+                                              href={price.url}
+                                              target="_blank"
                                               rel="noopener noreferrer"
                                               className="text-xs text-muted-foreground hover:text-primary"
                                             >
@@ -741,6 +858,71 @@ const TripPlanner = () => {
                         ) : (
                           <p className="text-muted-foreground text-center py-8">
                             Price comparison data will be included in your next trip plan
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  {/* Activities Tab - NEW */}
+                  <TabsContent value="activities">
+                    <div className="space-y-4">
+                      <div className="bg-card border border-border rounded-xl p-6">
+                        <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
+                          <Activity className="w-5 h-5 text-primary" />
+                          Activities Breakdown
+                        </h4>
+                        <p className="text-sm text-muted-foreground mb-6">
+                          Cost breakdown by activity category for your trip
+                        </p>
+
+                        {plan.cost_breakdown.activities_breakdown && plan.cost_breakdown.activities_breakdown.length > 0 ? (
+                          <div className="grid gap-4">
+                            {plan.cost_breakdown.activities_breakdown.map((category, idx) => {
+                              // Icon mapping for categories
+                              const categoryIcons = {
+                                adventure: Activity,
+                                dining: Utensils,
+                                cultural: Hotel,
+                                relaxation: CloudSun,
+                                nature: MapPin,
+                                shopping: Package,
+                                nightlife: Sparkles,
+                                photography: Heart
+                              };
+                              const CategoryIcon = categoryIcons[category.category] || Activity;
+
+                              return (
+                                <div key={idx} className="p-4 bg-secondary/30 rounded-xl">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-primary/10 rounded-lg">
+                                        <CategoryIcon className="w-5 h-5 text-primary" />
+                                      </div>
+                                      <div>
+                                        <h5 className="font-bold capitalize">{category.category}</h5>
+                                        <p className="text-xs text-muted-foreground">{category.activities.length} activities</p>
+                                      </div>
+                                    </div>
+                                    <span className="font-heading text-xl font-bold text-primary">
+                                      {getCurrencySymbol(plan.cost_breakdown.currency)}{category.cost.toLocaleString()}
+                                    </span>
+                                  </div>
+
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {category.activities.map((activity, aidx) => (
+                                      <span key={aidx} className="text-sm bg-background px-3 py-1 rounded-full border border-border">
+                                        {activity}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="text-muted-foreground text-center py-8">
+                            Activities breakdown will be available in your trip plan
                           </p>
                         )}
                       </div>
@@ -785,17 +967,42 @@ const TripPlanner = () => {
                         <Package className="w-5 h-5 text-primary" />
                         Packing List
                       </h4>
-                      <div className="grid grid-cols-2 gap-2">
-                        {plan.packing_suggestions.map((item, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg"
-                          >
-                            <Checkbox />
-                            <span className="text-sm">{item}</span>
-                          </div>
-                        ))}
-                      </div>
+
+                      {plan.packing_suggestions_detailed && plan.packing_suggestions_detailed.length > 0 ? (
+                        <div className="space-y-6">
+                          {plan.packing_suggestions_detailed.map((category, idx) => (
+                            <div key={idx} className="space-y-3">
+                              <h5 className="font-bold capitalize text-primary flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-primary"></span>
+                                {category.category}
+                              </h5>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-4">
+                                {category.items.map((item, iidx) => (
+                                  <div
+                                    key={iidx}
+                                    className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg"
+                                  >
+                                    <Checkbox />
+                                    <span className="text-sm">{item}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-2">
+                          {plan.packing_suggestions.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 p-2 bg-secondary/30 rounded-lg"
+                            >
+                              <Checkbox />
+                              <span className="text-sm">{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </TabsContent>
 
