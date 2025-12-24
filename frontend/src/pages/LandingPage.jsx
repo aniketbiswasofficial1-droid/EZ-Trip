@@ -3,15 +3,17 @@ import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import AuthModal from "@/components/AuthModal";
-import { 
-  Receipt, 
-  Users, 
-  RefreshCw, 
-  Globe, 
+import {
+  Receipt,
+  Users,
+  RefreshCw,
+  Globe,
   ArrowRight,
   Wallet,
   PieChart,
-  Shield
+  Shield,
+  Sparkles,
+  MapPin
 } from "lucide-react";
 
 const LandingPage = () => {
@@ -33,14 +35,20 @@ const LandingPage = () => {
 
   const features = [
     {
+      icon: Sparkles,
+      title: "AI Trip Planner",
+      description: "Let AI create your perfect itinerary. Get personalized recommendations for activities, restaurants, and attractions.",
+      highlight: true
+    },
+    {
       icon: Receipt,
       title: "Smart Expense Tracking",
       description: "Add expenses with multiple payers and custom splits. Never lose track of who paid what."
     },
     {
       icon: RefreshCw,
-      title: "Easy Refunds",
-      description: "Handle refunds seamlessly. Clear indication of what refund is for and automatic balance updates."
+      title: "Easy Refunds & Settlements",
+      description: "Handle refunds and record payments seamlessly. Clear tracking of who owes whom with automatic balance updates."
     },
     {
       icon: Globe,
@@ -56,11 +64,6 @@ const LandingPage = () => {
       icon: PieChart,
       title: "Smart Settlements",
       description: "Automatic calculation of who owes whom. Minimize the number of transactions needed."
-    },
-    {
-      icon: Shield,
-      title: "Secure & Private",
-      description: "Your financial data stays safe and private."
     }
   ];
 
@@ -73,16 +76,16 @@ const LandingPage = () => {
             <Wallet className="w-8 h-8 text-primary" />
             <span className="font-heading text-xl font-bold tracking-tight">EZ Trip</span>
           </div>
-          
+
           <div className="flex items-center gap-4">
-            <Button 
+            <Button
               variant="ghost"
               onClick={() => openAuth('login')}
               className="font-bold hover:text-primary"
             >
               Log In
             </Button>
-            <Button 
+            <Button
               onClick={() => openAuth('register')}
               className="rounded-full font-bold tracking-wide btn-glow"
             >
@@ -102,20 +105,20 @@ const LandingPage = () => {
                 <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
                 <span className="text-sm text-muted-foreground">Free forever for personal use</span>
               </div>
-              
+
               <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
                 Split expenses,
                 <br />
                 <span className="text-primary">not friendships</span>
               </h1>
-              
+
               <p className="text-lg text-muted-foreground max-w-lg">
-                The modern way to track and split trip expenses. Handle complex splits, 
-                manage refunds, and settle up with friends in any currency.
+                The modern way to track and split trip expenses. Handle complex splits,
+                manage refunds, settle up with friends, and plan your perfect trip with AI - all in one place.
               </p>
-              
+
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button 
+                <Button
                   onClick={() => openAuth('register')}
                   size="lg"
                   className="rounded-full font-bold tracking-wide btn-glow text-lg px-8 py-6"
@@ -149,9 +152,9 @@ const LandingPage = () => {
                 <div className="absolute -top-4 -right-4 bg-primary text-primary-foreground px-4 py-2 rounded-full text-sm font-bold">
                   Example Trip
                 </div>
-                
+
                 <h3 className="font-heading text-2xl font-bold mb-6">Beach Vacation</h3>
-                
+
                 <div className="space-y-4">
                   {/* Sample expense */}
                   <div className="bg-secondary/50 rounded-xl p-4 border border-border">
@@ -213,14 +216,21 @@ const LandingPage = () => {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
             {features.map((feature, index) => (
-              <div 
+              <div
                 key={index}
-                className="bg-card border border-border rounded-xl p-6 card-hover animate-fade-in opacity-0"
+                className={`bg-card border rounded-xl p-6 card-hover animate-fade-in opacity-0 ${feature.highlight ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
               >
-                <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center mb-4">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${feature.highlight ? 'bg-primary/20' : 'bg-primary/10'
+                  }`}>
                   <feature.icon className="w-6 h-6 text-primary" />
                 </div>
-                <h3 className="font-heading text-xl font-bold mb-2">{feature.title}</h3>
+                <h3 className="font-heading text-xl font-bold mb-2">
+                  {feature.title}
+                  {feature.highlight && (
+                    <span className="ml-2 text-xs bg-primary text-primary-foreground px-2 py-1 rounded-full">NEW</span>
+                  )}
+                </h3>
                 <p className="text-muted-foreground">{feature.description}</p>
               </div>
             ))}
@@ -228,21 +238,104 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Native Ad Slot Example */}
-      <section className="py-16 px-6">
+      {/* AI Trip Planner Promotion */}
+      <section className="py-24 px-6 bg-gradient-to-br from-primary/10 via-background to-background">
         <div className="max-w-7xl mx-auto">
-          <div className="bg-card border border-border rounded-xl p-6 card-hover relative">
-            <span className="absolute top-4 right-4 bg-white/10 text-xs px-2 py-1 rounded uppercase tracking-widest text-muted-foreground">
-              Sponsored
-            </span>
-            <div className="flex items-center gap-6">
-              <div className="w-20 h-20 bg-secondary rounded-xl flex items-center justify-center shrink-0">
-                <Globe className="w-10 h-10 text-muted-foreground" />
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left - Content */}
+            <div className="space-y-6 animate-fade-in">
+              <div className="inline-flex items-center gap-2 bg-primary/10 px-4 py-2 rounded-full border border-primary/20">
+                <Sparkles className="w-4 h-4 text-primary" />
+                <span className="text-sm font-medium text-primary">Powered by AI</span>
               </div>
-              <div>
-                <h3 className="font-heading text-xl font-bold mb-1">Travel Insurance</h3>
-                <p className="text-muted-foreground">Protect your next adventure with comprehensive travel coverage starting at $9/trip.</p>
+
+              <h2 className="font-heading text-4xl sm:text-5xl font-bold">
+                Plan your perfect trip with AI
+              </h2>
+
+              <p className="text-lg text-muted-foreground">
+                Stop spending hours researching. Our AI Trip Planner creates personalized day-by-day itineraries
+                with activities, restaurants, and attractions tailored to your preferences and budget.
+              </p>
+
+              <div className="space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <MapPin className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Personalized Itineraries</p>
+                    <p className="text-sm text-muted-foreground">Day-by-day plans customized to your style</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Smart Recommendations</p>
+                    <p className="text-sm text-muted-foreground">AI-powered suggestions for activities and dining</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <Globe className="w-4 h-4 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium">Budget Friendly</p>
+                    <p className="text-sm text-muted-foreground">Get cost estimates and booking links</p>
+                  </div>
+                </div>
               </div>
+
+              <Button
+                onClick={() => user ? navigate('/planner') : openAuth('register')}
+                size="lg"
+                className="rounded-full font-bold tracking-wide btn-glow text-lg px-8"
+              >
+                Try AI Trip Planner
+                <Sparkles className="w-5 h-5 ml-2" />
+              </Button>
+            </div>
+
+            {/* Right - Visual */}
+            <div className="relative">
+              <div className="bg-card border border-border rounded-2xl p-6 card-hover">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Sparkles className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-heading font-bold">AI Trip Planner</p>
+                    <p className="text-xs text-muted-foreground">Your personal travel assistant</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="bg-secondary/50 rounded-lg p-4">
+                    <p className="text-sm font-medium mb-1">Day 1 - Arrival & Exploration</p>
+                    <p className="text-xs text-muted-foreground">Morning: City walking tour • Lunch: Local cuisine • Evening: Rooftop bar</p>
+                  </div>
+                  <div className="bg-secondary/50 rounded-lg p-4">
+                    <p className="text-sm font-medium mb-1">Day 2 - Cultural Experience</p>
+                    <p className="text-xs text-muted-foreground">Visit museums • Traditional dinner • Night market</p>
+                  </div>
+                  <div className="bg-secondary/50 rounded-lg p-4">
+                    <p className="text-sm font-medium mb-1">Day 3 - Adventure Day</p>
+                    <p className="text-xs text-muted-foreground">Hiking trip • Beach time • Sunset viewing</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Estimated Budget</span>
+                    <span className="font-heading font-bold text-primary">$850 - $1,200</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Decorative elements */}
+              <div className="absolute -z-10 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary/5 rounded-full blur-3xl"></div>
             </div>
           </div>
         </div>
@@ -257,7 +350,7 @@ const LandingPage = () => {
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
             Join thousands of travelers who trust EZ Trip for fair and easy expense splitting.
           </p>
-          <Button 
+          <Button
             onClick={() => openAuth('register')}
             size="lg"
             className="rounded-full font-bold tracking-wide btn-glow text-lg px-8 py-6"
@@ -282,9 +375,9 @@ const LandingPage = () => {
       </footer>
 
       {/* Auth Modal - Pass the initial tab state if your AuthModal supports it */}
-      <AuthModal 
-        isOpen={isAuthOpen} 
-        onClose={() => setIsAuthOpen(false)} 
+      <AuthModal
+        isOpen={isAuthOpen}
+        onClose={() => setIsAuthOpen(false)}
         defaultTab={initialAuthTab}
       />
     </div>

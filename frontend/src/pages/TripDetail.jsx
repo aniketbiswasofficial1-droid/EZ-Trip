@@ -49,6 +49,7 @@ import {
   UserPlus,
   X,
   ArrowRight,
+  ArrowLeftRight,
   Calendar,
   Globe,
   Pencil,
@@ -74,6 +75,7 @@ const TripDetail = () => {
   const [editExpenseOpen, setEditExpenseOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [addRefundOpen, setAddRefundOpen] = useState(false);
+  const [addSettlementOpen, setAddSettlementOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
 
   // New expense form
@@ -85,7 +87,7 @@ const TripDetail = () => {
     payers: [],
     splits: [],
   });
-  
+
   // Multiple payers mode
   const [multiplePayersMode, setMultiplePayersMode] = useState(false);
   const [singlePayer, setSinglePayer] = useState("");
@@ -99,10 +101,18 @@ const TripDetail = () => {
     reason: "",
     refunded_to: [],
   });
-  
+
   // Edit refund state
   const [editRefundOpen, setEditRefundOpen] = useState(false);
   const [selectedRefund, setSelectedRefund] = useState(null);
+
+  // Settlement form state
+  const [newSettlement, setNewSettlement] = useState({
+    from_user_id: "",
+    to_user_id: "",
+    amount: "",
+    note: ""
+  });
 
   useEffect(() => {
     fetchTrip();
@@ -290,17 +300,17 @@ const TripDetail = () => {
   // Open edit expense dialog
   const openEditExpense = (expense) => {
     setSelectedExpense(expense);
-    
+
     // Check if multiple payers
     const hasMultiplePayers = expense.payers.length > 1;
     setMultiplePayersMode(hasMultiplePayers);
-    
+
     if (hasMultiplePayers) {
       setSinglePayer("");
     } else {
       setSinglePayer(expense.payers[0]?.user_id || "");
     }
-    
+
     setNewExpense({
       description: expense.description,
       total_amount: expense.total_amount.toString(),
@@ -309,14 +319,14 @@ const TripDetail = () => {
       payers: expense.payers,
       splits: expense.splits,
     });
-    
+
     setEditExpenseOpen(true);
   };
 
   const resetExpenseForm = () => {
     // Auto-select all members for split by default
     const defaultSplits = trip?.members.map(m => ({ user_id: m.user_id, amount: 0 })) || [];
-    
+
     setNewExpense({
       description: "",
       total_amount: "",
@@ -378,7 +388,7 @@ const TripDetail = () => {
     } else {
       newSplits = newExpense.splits.filter((s) => s.user_id !== member.user_id);
     }
-    
+
     // Auto-recalculate equal splits
     const calculatedSplits = autoCalculateEqualSplits(newExpense.total_amount, newSplits);
     setNewExpense((prev) => ({
@@ -538,6 +548,51 @@ const TripDetail = () => {
     return member?.name || "Unknown";
   };
 
+  // Handle settlement creation
+  const handleRecordSettlement = async (e) => {
+    e.preventDefault();
+
+    if (!newSettlement.from_user_id || !newSettlement.to_user_id) {
+      toast.error("Please select both payer and recipient");
+      return;
+    }
+
+    if (parseFloat(newSettlement.amount) <= 0) {
+      toast.error("Amount must be greater than 0");
+      return;
+    }
+
+    if (newSettlement.from_user_id === newSettlement.to_user_id) {
+      toast.error("Payer and recipient cannot be the same person");
+      return;
+    }
+
+    try {
+      await axios.post(
+        `${API}/settlements`,
+        {
+          trip_id: tripId,
+          from_user_id: newSettlement.from_user_id,
+          to_user_id: newSettlement.to_user_id,
+          amount: parseFloat(newSettlement.amount),
+          note: newSettlement.note || undefined
+        },
+        { withCredentials: true }
+      );
+
+      toast.success("Payment recorded successfully!");
+      setAddSettlementOpen(false);
+      setNewSettlement({ from_user_id: "", to_user_id: "", amount: "", note: "" });
+
+      // Refresh all data
+      fetchTrip();
+      fetchBalances();
+      fetchSettlements();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to record payment");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -673,9 +728,8 @@ const TripDetail = () => {
           <div className="bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
             <p className="text-sm text-muted-foreground mb-1">Your Balance</p>
             <p
-              className={`font-heading text-2xl font-bold ${
-                trip.your_balance >= 0 ? "balance-positive" : "balance-negative"
-              }`}
+              className={`font-heading text-2xl font-bold ${trip.your_balance >= 0 ? "balance-positive" : "balance-negative"
+                }`}
               data-testid="trip-your-balance"
             >
               {trip.your_balance >= 0 ? "+" : ""}
@@ -718,41 +772,130 @@ const TripDetail = () => {
           </div>
         </div>
 
-        {/* Add Expense Button */}
+        {/* Members Section */}
         <div className="mb-8">
-          <Dialog open={addExpenseOpen} onOpenChange={(open) => {
-            setAddExpenseOpen(open);
-            if (open && trip) {
-              // Initialize with all members selected for split
-              const defaultSplits = trip.members.map(m => ({ user_id: m.user_id, amount: 0 }));
-              setNewExpense({
-                description: "",
-                total_amount: "",
-                currency: trip.currency || "USD",
-                category: "general",
-                payers: [],
-                splits: defaultSplits,
-              });
-              setMultiplePayersMode(false);
-              setSinglePayer("");
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button
-                className="w-full sm:w-auto rounded-full font-bold tracking-wide btn-glow"
-                data-testid="add-expense-btn"
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-heading text-xl font-bold">Trip Members</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-children">
+            {trip.members.map((member) => (
+              <div
+                key={member.user_id}
+                className="bg-card border border-border rounded-xl p-4 animate-fade-in opacity-0 card-hover relative"
+                data-testid={`member-card-${member.user_id}`}
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Expense
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
-              <DialogHeader className="sticky top-0 bg-card z-10 pb-4">
-                <DialogTitle className="font-heading text-2xl">
-                  Add Expense
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateExpense} className="space-y-6 pb-4">
+                {/* Delete button - only for trip creator and can't delete self */}
+                {trip.created_by === user?.user_id && member.user_id !== user?.user_id && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-2 right-2 h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        data-testid={`delete-member-${member.user_id}`}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remove Member?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to remove {member.name} from this trip?
+                          This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={async () => {
+                            try {
+                              await axios.delete(
+                                `${API}/trips/${tripId}/members/${member.user_id}`,
+                                { withCredentials: true }
+                              );
+                              toast.success("Member removed");
+                              fetchTrip();
+                              fetchBalances();
+                            } catch (error) {
+                              toast.error(error.response?.data?.detail || "Failed to remove member");
+                            }
+                          }}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Remove
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+
+                <div className="flex flex-col items-center text-center">
+                  <Avatar className="w-16 h-16 mb-3">
+                    <AvatarImage src={member.picture} />
+                    <AvatarFallback className="text-lg font-bold">
+                      {member.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <h3 className="font-heading font-bold mb-1">{member.name}</h3>
+                  <p className="text-xs text-muted-foreground truncate w-full px-2">
+                    {member.email}
+                  </p>
+                  {trip.created_by === member.user_id && (
+                    <span className="mt-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                      Trip Creator
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Add Expense Button */}
+            <Dialog open={addExpenseOpen} onOpenChange={(open) => {
+              setAddExpenseOpen(open);
+              if (open && trip) {
+                // Initialize with all members selected for split
+                const defaultSplits = trip.members.map(m => ({ user_id: m.user_id, amount: 0 }));
+                setNewExpense({
+                  description: "",
+                  total_amount: "",
+                  currency: trip.currency || "USD",
+                  category: "general",
+                  payers: [],
+                  splits: defaultSplits,
+                });
+                setMultiplePayersMode(false);
+                setSinglePayer("");
+              }
+            }}>
+              <DialogTrigger asChild>
+                <div className="relative group">
+                  <Button
+                    className="flex-1 sm:flex-none rounded-full font-bold tracking-wide btn-glow"
+                    data-testid="add-expense-btn"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Expense
+                  </Button>
+                  {/* Tooltip */}
+                  <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border whitespace-nowrap z-50">
+                    Add Your Expenses
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-popover" />
+                  </div>
+                </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogHeader className="sticky top-0 bg-card z-10 pb-4">
+                  <DialogTitle className="font-heading text-2xl">
+                    Add Expense
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateExpense} className="space-y-6 pb-4">
                   {/* Description */}
                   <div className="space-y-2">
                     <Label htmlFor="expense-description">Description</Label>
@@ -822,7 +965,7 @@ const TripDetail = () => {
                         />
                       </div>
                     </div>
-                    
+
                     {!multiplePayersMode ? (
                       // Single payer mode - simple dropdown
                       <Select value={singlePayer} onValueChange={setSinglePayer}>
@@ -874,7 +1017,7 @@ const TripDetail = () => {
                                     if (existing) {
                                       return {
                                         ...prev,
-                                        payers: prev.payers.map(p => 
+                                        payers: prev.payers.map(p =>
                                           p.user_id === member.user_id ? { ...p, amount } : p
                                         )
                                       };
@@ -957,8 +1100,123 @@ const TripDetail = () => {
                     Add Expense
                   </Button>
                 </form>
-            </DialogContent>
-          </Dialog>
+              </DialogContent>
+            </Dialog>
+
+            {/* Record Settlement Button */}
+            <div className="flex-1 sm:flex-none">
+              <Dialog open={addSettlementOpen} onOpenChange={setAddSettlementOpen}>
+                <DialogTrigger asChild>
+                  <div className="relative group">
+                    <Button
+                      className="w-full rounded-full font-bold tracking-wide text-black shadow-lg hover:shadow-xl transition-all duration-200"
+                      style={{ background: 'linear-gradient(to right, #00ff8b, #00e67a)', }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'linear-gradient(to right, #00e67a, #00cc6b)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'linear-gradient(to right, #00ff8b, #00e67a)'; }}
+                      data-testid="record-payment-btn"
+                    >
+                      <ArrowLeftRight className="w-4 h-4 mr-2" />
+                      Settle Up
+                    </Button>
+                    {/* Tooltip */}
+                    <div className="absolute hidden group-hover:block bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-popover text-popover-foreground text-xs rounded-lg shadow-lg border border-border whitespace-nowrap z-50">
+                      Record Payments Between Members
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-popover" />
+                    </div>
+                  </div>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="font-heading text-2xl">
+                      Settle Up Payment
+                    </DialogTitle>
+                    <DialogDescription>
+                      Record a payment between trip members to settle debts
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleRecordSettlement} className="space-y-4 pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="from-user">Who Paid</Label>
+                      <Select
+                        value={newSettlement.from_user_id}
+                        onValueChange={(value) =>
+                          setNewSettlement({ ...newSettlement, from_user_id: value })
+                        }
+                      >
+                        <SelectTrigger id="from-user" data-testid="from-user-select">
+                          <SelectValue placeholder="Select payer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {trip?.members.map((member) => (
+                            <SelectItem key={member.user_id} value={member.user_id}>
+                              {member.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="to-user">To Whom</Label>
+                      <Select
+                        value={newSettlement.to_user_id}
+                        onValueChange={(value) =>
+                          setNewSettlement({ ...newSettlement, to_user_id: value })
+                        }
+                      >
+                        <SelectTrigger id="to-user" data-testid="to-user-select">
+                          <SelectValue placeholder="Select recipient" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {trip?.members.map((member) => (
+                            <SelectItem key={member.user_id} value={member.user_id}>
+                              {member.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="settlement-amount">Amount</Label>
+                      <Input
+                        id="settlement-amount"
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        value={newSettlement.amount}
+                        onChange={(e) =>
+                          setNewSettlement({ ...newSettlement, amount: e.target.value })
+                        }
+                        data-testid="settlement-amount-input"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="settlement-note">Note (Optional)</Label>
+                      <Input
+                        id="settlement-note"
+                        placeholder="e.g., Cash payment..."
+                        value={newSettlement.note}
+                        onChange={(e) =>
+                          setNewSettlement({ ...newSettlement, note: e.target.value })
+                        }
+                        data-testid="settlement-note-input"
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full rounded-full font-bold btn-glow"
+                      data-testid="submit-settlement-btn"
+                    >
+                      Record Payment
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
         </div>
 
         {/* Tabs */}
@@ -986,7 +1244,7 @@ const TripDetail = () => {
               data-testid="settlements-tab"
             >
               <RefreshCw className="w-4 h-4 mr-2" />
-              Settle Up
+              Settlement Summary
             </TabsTrigger>
           </TabsList>
 
@@ -1180,9 +1438,8 @@ const TripDetail = () => {
                     </div>
                   </div>
                   <p
-                    className={`font-heading text-xl font-bold ${
-                      balance.balance >= 0 ? "balance-positive" : "balance-negative"
-                    }`}
+                    className={`font-heading text-xl font-bold ${balance.balance >= 0 ? "balance-positive" : "balance-negative"
+                      }`}
                   >
                     {balance.balance >= 0 ? "+" : ""}
                     {getCurrencySymbol(trip.currency)}
@@ -1439,7 +1696,7 @@ const TripDetail = () => {
                     />
                   </div>
                 </div>
-                
+
                 {!multiplePayersMode ? (
                   <Select value={singlePayer} onValueChange={setSinglePayer}>
                     <SelectTrigger data-testid="edit-single-payer-select">
@@ -1486,7 +1743,7 @@ const TripDetail = () => {
                                 if (existing) {
                                   return {
                                     ...prev,
-                                    payers: prev.payers.map(p => 
+                                    payers: prev.payers.map(p =>
                                       p.user_id === member.user_id ? { ...p, amount } : p
                                     )
                                   };

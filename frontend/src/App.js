@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation, Link } from "re
 import axios from "axios";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
+import { GoogleOAuthProvider } from '@react-oauth/google';
 
 // Pages
 import LandingPage from "@/pages/LandingPage";
@@ -53,7 +54,7 @@ const AuthProvider = ({ children }) => {
   // NEW: Email/Password Login
   const loginWithPassword = async (email, password) => {
     try {
-      const response = await axios.post(`${API}/auth/login`, 
+      const response = await axios.post(`${API}/auth/login`,
         { email, password },
         { withCredentials: true }
       );
@@ -66,10 +67,28 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  // Google OAuth Login with ID token
+  const loginWithGoogle = async (idToken) => {
+    try {
+      const response = await axios.post(`${API}/auth/google`,
+        {
+          id_token: idToken
+        },
+        { withCredentials: true }
+      );
+      setUser(response.data);
+      toast.success("Welcome!");
+      return response.data;
+    } catch (error) {
+      console.error("Google login error:", error);
+      throw error;
+    }
+  };
+
   // NEW: Registration
   const register = async (name, email, password) => {
     try {
-      const response = await axios.post(`${API}/auth/register`, 
+      const response = await axios.post(`${API}/auth/register`,
         { name, email, password },
         { withCredentials: true }
       );
@@ -97,15 +116,16 @@ const AuthProvider = ({ children }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      setUser, 
-      loading, 
-      login, 
-      loginWithPassword, 
-      register, 
-      logout, 
-      checkAuth 
+    <AuthContext.Provider value={{
+      user,
+      setUser,
+      loading,
+      login,
+      loginWithPassword,
+      loginWithGoogle,
+      register,
+      logout,
+      checkAuth
     }}>
       {children}
     </AuthContext.Provider>
@@ -126,17 +146,17 @@ const AuthCallback = () => {
     const processSession = async () => {
       const hash = location.hash;
       const sessionIdMatch = hash.match(/session_id=([^&]+)/);
-      
+
       if (sessionIdMatch) {
         const sessionId = sessionIdMatch[1];
-        
+
         try {
           const response = await axios.post(
             `${API}/auth/session`,
             { session_id: sessionId },
             { withCredentials: true }
           );
-          
+
           setUser(response.data);
           toast.success("Welcome back!");
           navigate('/dashboard', { replace: true, state: { user: response.data } });
@@ -242,24 +262,28 @@ function AppRouter() {
 }
 
 function App() {
+  const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
+
   return (
-    <div className="App noise-bg min-h-screen">
-      <BrowserRouter>
-        <AuthProvider>
-          <AppRouter />
-          <Toaster 
-            position="top-right"
-            toastOptions={{
-              style: {
-                background: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                color: 'hsl(var(--foreground))'
-              }
-            }}
-          />
-        </AuthProvider>
-      </BrowserRouter>
-    </div>
+    <GoogleOAuthProvider clientId={googleClientId}>
+      <div className="App noise-bg min-h-screen">
+        <BrowserRouter>
+          <AuthProvider>
+            <AppRouter />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: 'hsl(var(--card))',
+                  border: '1px solid hsl(var(--border))',
+                  color: 'hsl(var(--foreground))'
+                }
+              }}
+            />
+          </AuthProvider>
+        </BrowserRouter>
+      </div>
+    </GoogleOAuthProvider>
   );
 }
 

@@ -7,12 +7,13 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/App";
 import { toast } from "sonner";
 import { Wallet, Eye, EyeOff, Check, X } from "lucide-react";
+import { GoogleLogin } from '@react-oauth/google';
 
-const AuthModal = ({ isOpen, onClose }) => {
-  const { loginWithPassword, register } = useAuth();
-  const [activeTab, setActiveTab] = useState("login");
+const AuthModal = ({ isOpen, onClose, defaultTab = "login" }) => {
+  const { loginWithPassword, loginWithGoogle, register } = useAuth();
+  const [activeTab, setActiveTab] = useState(defaultTab);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Visibility States
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -29,7 +30,7 @@ const AuthModal = ({ isOpen, onClose }) => {
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    
+
     // Real-time validation for registration
     if (activeTab === "register" && e.target.name === "password") {
       validatePasswordStrength(e.target.value);
@@ -83,6 +84,22 @@ const AuthModal = ({ isOpen, onClose }) => {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    try {
+      await loginWithGoogle(credentialResponse.credential);
+      onClose();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Google sign-in failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleError = () => {
+    toast.error("Google sign-in failed");
+  };
+
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
   const toggleConfirmVisibility = () => setShowConfirmPassword(!showConfirmPassword);
 
@@ -104,7 +121,7 @@ const AuthModal = ({ isOpen, onClose }) => {
           setPasswordError("");
         }} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
-            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="login">Log In</TabsTrigger>
             <TabsTrigger value="register">Sign Up</TabsTrigger>
           </TabsList>
 
@@ -122,7 +139,7 @@ const AuthModal = ({ isOpen, onClose }) => {
                 />
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -201,6 +218,30 @@ const AuthModal = ({ isOpen, onClose }) => {
               {isLoading ? "Processing..." : (activeTab === "login" ? "Sign In" : "Create Account")}
             </Button>
           </form>
+
+          {/* Google Sign-In */}
+          <div className="mt-4">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            <div className="mt-4 flex justify-center">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                theme="filled_blue"
+                size="large"
+                text={activeTab === "login" ? "signin_with" : "signup_with"}
+                width="100%"
+                logo_alignment="left"
+              />
+            </div>
+          </div>
         </Tabs>
       </DialogContent>
     </Dialog>

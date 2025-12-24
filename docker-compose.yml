@@ -20,6 +20,11 @@ services:
       - DB_NAME=eztrip
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
     depends_on:
       - mongodb
     volumes:
@@ -36,6 +41,7 @@ services:
     environment:
       # CHANGED: Renamed from REACT_APP_API_URL to REACT_APP_BACKEND_URL to match App.js
       - REACT_APP_BACKEND_URL=http://localhost:8000
+      - REACT_APP_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - WATCHPACK_POLLING=true
     depends_on:
       - backend
@@ -49,6 +55,7 @@ services:
 
 volumes:
   mongodb_data:
+
 
 networks:
   eztrip-network:

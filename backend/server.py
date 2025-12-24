@@ -14,6 +14,9 @@ import re  # Required for password validation
 from datetime import datetime, timezone, timedelta
 import httpx
 from trip_planner import trip_planner, TripPlanRequest, TripPlanResponse
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
+from email_service import EmailService
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -48,6 +51,7 @@ auth_router = APIRouter(prefix="/auth")
 trips_router = APIRouter(prefix="/trips")
 expenses_router = APIRouter(prefix="/expenses")
 refunds_router = APIRouter(prefix="/refunds")
+settlements_router = APIRouter(prefix="/settlements")
 planner_router = APIRouter(prefix="/planner")
 admin_router = APIRouter(prefix="/admin")
 
@@ -181,6 +185,26 @@ class TripAddMember(BaseModel):
     email: str
     name: str
 
+class SettlementCreate(BaseModel):
+    trip_id: str
+    from_user_id: str
+    to_user_id: str
+    amount: float
+    note: Optional[str] = None
+
+class SettlementEntry(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    settlement_id: str
+    trip_id: str
+    from_user_id: str
+    from_user_name: str
+    to_user_id: str
+    to_user_name: str
+    amount: float
+    note: Optional[str] = None
+    created_by: str
+    created_at: datetime
+
 # ========================
 # AUTH HELPERS
 # ========================
@@ -294,6 +318,9 @@ async def register(user_data: UserRegister, response: Response):
         
         await db.users.insert_one(new_user)
         
+        # Link user to existing trips where they were added as a guest
+        await link_user_to_existing_trips(user_id, user_data.email)
+        
         # Create session immediately
         session_token = f"session_{uuid.uuid4().hex}"
         expires_at = datetime.now(timezone.utc) + timedelta(days=7)
@@ -378,6 +405,204 @@ async def logout(request: Request, response: Response):
     )
     
     return {"message": "Logged out"}
+
+async def link_user_to_existing_trips(user_id: str, email: str):
+    """Link a newly registered/logged in user to trips they were added to as a guest"""
+    try:
+        # Get the user's current profile info
+        user = await db.users.find_one({"user_id": user_id})
+        if not user:
+            return
+            
+        user_name = user.get("name", "")
+        user_picture = user.get("picture", "")
+        
+        # Find all trips where this email exists as a guest member
+        trips_cursor = db.trips.find({"members.email": email})
+        trips = await trips_cursor.to_list(None)
+        
+        for trip in trips:
+            # Find the member with this email and a guest user_id
+            for i, member in enumerate(trip["members"]):
+                if member["email"] == email and member["user_id"].startswith("guest_"):
+                    old_user_id = member["user_id"]
+                    logger.info(f"Linking user {user_id} to trip {trip['trip_id']}, replacing guest {old_user_id}")
+                    
+                    # Update trip member with user_id, name, and picture
+                    trip["members"][i]["user_id"] = user_id
+                    await db.trips.update_one(
+                        {"trip_id": trip["trip_id"]},
+                        {"$set": {
+                            f"members.{i}.user_id": user_id,
+                            f"members.{i}.name": user_name,
+                            f"members.{i}.picture": user_picture
+                        }}
+                    )
+                    
+                    # Update all expenses where this user was a payer
+                    await db.expenses.update_many(
+                        {"trip_id": trip["trip_id"], "payers.user_id": old_user_id},
+                        {"$set": {"payers.$[elem].user_id": user_id}},
+                        array_filters=[{"elem.user_id": old_user_id}]
+                    )
+                    
+                    # Update all expenses where this user was in splits
+                    await db.expenses.update_many(
+                        {"trip_id": trip["trip_id"], "splits.user_id": old_user_id},
+                        {"$set": {"splits.$[elem].user_id": user_id}},
+                        array_filters=[{"elem.user_id": old_user_id}]
+                    )
+                    
+                    # Update all refunds
+                    refunds_cursor = db.refunds.find({"trip_id": trip["trip_id"]})
+                    refunds = await refunds_cursor.to_list(None)
+                    for refund in refunds:
+                        if old_user_id in refund.get("refunded_to", []):
+                            new_refunded_to = [user_id if uid == old_user_id else uid for uid in refund["refunded_to"]]
+                            await db.refunds.update_one(
+                                {"refund_id": refund["refund_id"]},
+                                {"$set": {"refunded_to": new_refunded_to}}
+                            )
+                    
+                    # Update settlements if they exist
+                    await db.settlements.update_many(
+                        {"trip_id": trip["trip_id"], "from_user_id": old_user_id},
+                        {"$set": {"from_user_id": user_id}}
+                    )
+                    await db.settlements.update_many(
+                        {"trip_id": trip["trip_id"], "to_user_id": old_user_id},
+                        {"$set": {"to_user_id": user_id}}
+                    )
+                    
+                    logger.info(f"Successfully linked {email} to trip {trip['trip_id']}")
+                    
+    except Exception as e:
+        logger.error(f"Error linking user to existing trips: {str(e)}")
+
+async def update_user_in_all_trips(user_id: str, name: str, picture: str):
+    """Update user's name and picture in all trips they're a member of"""
+    try:
+        # Find all trips where this user is a member
+        trips_cursor = db.trips.find({"members.user_id": user_id})
+        trips = await trips_cursor.to_list(None)
+        
+        for trip in trips:
+            # Find the member index
+            for i, member in enumerate(trip["members"]):
+                if member["user_id"] == user_id:
+                    # Update member's name and picture
+                    await db.trips.update_one(
+                        {"trip_id": trip["trip_id"]},
+                        {"$set": {
+                            f"members.{i}.name": name,
+                            f"members.{i}.picture": picture
+                        }}
+                    )
+                    logger.info(f"Updated user {user_id} profile in trip {trip['trip_id']}")
+                    break
+                    
+    except Exception as e:
+        logger.error(f"Error updating user in trips: {str(e)}")
+
+
+# Google OAuth Login
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+@auth_router.post("/google")
+async def google_auth(auth_data: GoogleAuthRequest, response: Response):
+    """Authenticate with Google OAuth"""
+    try:
+        # Verify the Google ID token
+        google_client_id = os.getenv('GOOGLE_CLIENT_ID')
+        if not google_client_id:
+            raise HTTPException(status_code=500, detail="Google OAuth not configured")
+        
+        # Verify the Google ID token with clock skew tolerance
+        # This allows for small time differences between client and server
+        idinfo = id_token.verify_oauth2_token(
+            auth_data.id_token, 
+            google_requests.Request(), 
+            google_client_id,
+            clock_skew_in_seconds=10  # Allow 10 seconds of clock skew
+        )
+        
+        email = idinfo.get('email')
+        name = idinfo.get('name')
+        picture = idinfo.get('picture')
+        google_id = idinfo.get('sub')
+        
+        if not email:
+            raise HTTPException(status_code=400, detail="Email not provided by Google")
+        
+        # Check if user exists
+        user = await db.users.find_one({"email": email})
+        
+        if user:
+            # User exists - update their profile info from Google
+            user_id = user["user_id"]
+            
+            # Update user's picture and name from Google
+            await db.users.update_one(
+                {"user_id": user_id},
+                {"$set": {
+                    "picture": picture,
+                    "name": name,
+                    "oauth_provider": "google",
+                    "oauth_id": google_id
+                }}
+            )
+            
+            # Update user's profile in all trips they're a member of
+            await update_user_in_all_trips(user_id, name, picture)
+        else:
+            # Create new user
+            user_id = f"user_{uuid.uuid4().hex[:12]}"
+            new_user = {
+                "user_id": user_id,
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "oauth_provider": "google",
+                "oauth_id": google_id,
+                "default_currency": "USD",
+                "created_at": datetime.now(timezone.utc).isoformat()
+            }
+            await db.users.insert_one(new_user)
+            
+            # Link to existing trips
+            await link_user_to_existing_trips(user_id, email)
+        
+        # Create session
+        session_token = f"session_{uuid.uuid4().hex}"
+        expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+        
+        await db.user_sessions.insert_one({
+            "user_id": user_id,
+            "session_token": session_token,
+            "expires_at": expires_at.isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        
+        # Set cookie
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=False,
+            samesite="lax",
+            path="/",
+            max_age=7 * 24 * 60 * 60
+        )
+        
+        return {"user_id": user_id, "name": name, "email": email, "picture": picture}
+        
+    except ValueError as e:
+        logger.error(f"Google OAuth error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Invalid Google token")
+    except Exception as e:
+        logger.error(f"Google OAuth error: {str(e)}")
+        raise HTTPException(status_code=500, detail="Authentication failed")
 
 @auth_router.put("/me")
 async def update_user(
@@ -645,6 +870,21 @@ async def add_member(
         {"$push": {"members": new_member}}
     )
     
+    # Send email notification to the new member
+    try:
+        trip_creator = next((m for m in trip["members"] if m["user_id"] == user["user_id"]), None)
+        if trip_creator:
+            await EmailService.send_member_added_notification(
+                trip_name=trip["name"],
+                new_member_name=new_member["name"],
+                new_member_email=new_member["email"],
+                added_by_name=trip_creator["name"]
+            )
+            logger.info(f"Sent member added notification to {new_member['email']}")
+    except Exception as e:
+        logger.error(f"Failed to send member added notification: {str(e)}")
+        # Don't fail the request if email fails
+    
     return {"message": "Member added", "member": new_member}
 
 @trips_router.delete("/{trip_id}/members/{member_user_id}")
@@ -757,6 +997,20 @@ async def get_trip_balances(
                     adjusted_split = net_amount * original_split_ratio
                     balances[split["user_id"]] -= adjusted_split
     
+    # Apply settlements to balances
+    all_settlements = await db.settlements.find(
+        {"trip_id": trip_id},
+        {"_id": 0}
+    ).to_list(1000)
+    
+    for settlement in all_settlements:
+        # Reduce amount owed by from_user (increase their balance)
+        if settlement["from_user_id"] in balances:
+            balances[settlement["from_user_id"]] += settlement["amount"]
+        # Reduce amount owed to to_user (decrease their balance)
+        if settlement["to_user_id"] in balances:
+            balances[settlement["to_user_id"]] -= settlement["amount"]
+    
     return [
         BalanceEntry(
             user_id=uid,
@@ -856,6 +1110,29 @@ async def create_expense(
     }
     
     await db.expenses.insert_one(expense_doc)
+    
+    # Send email notification to all trip members
+    try:
+        member_emails = [m["email"] for m in trip["members"] if m.get("email")]
+        if member_emails:
+            # Get payer names
+            payer_names = []
+            for payer in expense.payers:
+                member = next((m for m in trip["members"] if m["user_id"] == payer.user_id), None)
+                if member:
+                    payer_names.append(member["name"])
+            
+            await EmailService.send_expense_added_notification(
+                trip_name=trip["name"],
+                expense_description=expense.description,
+                amount=expense.total_amount,
+                currency=expense.currency,
+                payer_names=payer_names,
+                recipient_emails=member_emails
+            )
+            logger.info(f"Sent expense notification to {len(member_emails)} trip members")
+    except Exception as e:
+        logger.warning(f"Failed to send expense notification: {str(e)}")
     
     # Remove date and created_at from expense_doc before passing to ExpenseResponse
     expense_response_data = {k: v for k, v in expense_doc.items() if k not in ["date", "created_at"]}
@@ -1749,6 +2026,121 @@ async def get_public_content():
         organized[section][c["key"]] = c["value"]
     return organized
 
+# ========================
+# SETTLEMENTS ROUTES
+# ========================
+
+@settlements_router.post("", response_model=SettlementEntry)
+async def create_settlement(
+    settlement: SettlementCreate,
+    user: dict = Depends(get_current_user)
+):
+    """Record a settlement/payment between trip members"""
+    trip = await db.trips.find_one(
+        {"trip_id": settlement.trip_id, "members.user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    # Get member names
+    from_member = next((m for m in trip["members"] if m["user_id"] == settlement.from_user_id), None)
+    to_member = next((m for m in trip["members"] if m["user_id"] == settlement.to_user_id), None)
+    
+    if not from_member or not to_member:
+        raise HTTPException(status_code=400, detail="Invalid user IDs")
+    
+    settlement_id = f"settlement_{uuid.uuid4().hex[:12]}"
+    settlement_doc = {
+        "settlement_id": settlement_id,
+        "trip_id": settlement.trip_id,
+        "from_user_id": settlement.from_user_id,
+        "from_user_name": from_member["name"],
+        "to_user_id": settlement.to_user_id,
+        "to_user_name": to_member["name"],
+        "amount": settlement.amount,
+        "note": settlement.note,
+        "created_by": user["user_id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.settlements.insert_one(settlement_doc)
+    
+    # Send email notification to all trip members
+    try:
+        member_emails = [m["email"] for m in trip["members"] if m.get("email")]
+        if member_emails:
+            await EmailService.send_settlement_notification(
+                trip_name=trip["name"],
+                from_user_name=from_member["name"],
+                to_user_name=to_member["name"],
+                amount=settlement.amount,
+                currency=trip["currency"],
+                recipient_emails=member_emails,
+                note=settlement.note
+            )
+    except Exception as e:
+        logger.warning(f"Failed to send settlement notification: {str(e)}")
+    
+    if isinstance(settlement_doc.get("created_at"), str):
+        settlement_doc["created_at"] = datetime.fromisoformat(settlement_doc["created_at"])
+    
+    return SettlementEntry(**settlement_doc)
+
+@settlements_router.get("/{trip_id}", response_model=List[SettlementEntry])
+async def get_settlements(
+    trip_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Get all settlements for a trip"""
+    trip = await db.trips.find_one(
+        {"trip_id": trip_id, "members.user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    
+    settlements = await db.settlements.find(
+        {"trip_id": trip_id},
+        {"_id": 0}
+    ).sort("created_at", -1).to_list(100)
+    
+    result = []
+    for s in settlements:
+        if isinstance(s.get("created_at"), str):
+            s["created_at"] = datetime.fromisoformat(s["created_at"])
+        result.append(SettlementEntry(**s))
+    
+    return result
+
+@settlements_router.delete("/{settlement_id}")
+async def delete_settlement(
+    settlement_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Delete a settlement (undo)"""
+    settlement = await db.settlements.find_one(
+        {"settlement_id": settlement_id},
+        {"_id": 0}
+    )
+    
+    if not settlement:
+        raise HTTPException(status_code=404, detail="Settlement not found")
+    
+    # Only the creator can delete
+    if settlement["created_by"] != user["user_id"]:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    
+    await db.settlements.delete_one({"settlement_id": settlement_id})
+    
+    return {"message": "Settlement deleted"}
+
+# ========================
+# ADMIN MANAGEMENT ROUTES
+# ========================
+
 @api_router.get("/public/settings")
 async def get_public_settings():
     """Get public app settings (no auth required)"""
@@ -1832,6 +2224,7 @@ api_router.include_router(auth_router)
 api_router.include_router(trips_router)
 api_router.include_router(expenses_router)
 api_router.include_router(refunds_router)
+api_router.include_router(settlements_router)
 api_router.include_router(planner_router)
 api_router.include_router(admin_router)
 
