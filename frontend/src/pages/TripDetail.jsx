@@ -55,8 +55,11 @@ import {
   Pencil,
   Lock,
   Unlock,
+  Map,
+  Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
+import { PlanViewer } from "@/components/PlanViewer";
 
 const TripDetail = () => {
   const { tripId } = useParams();
@@ -67,6 +70,7 @@ const TripDetail = () => {
   const [expenses, setExpenses] = useState([]);
   const [balances, setBalances] = useState([]);
   const [settlements, setSettlements] = useState([]);
+  const [linkedPlan, setLinkedPlan] = useState(null);
   const [currencies, setCurrencies] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -120,6 +124,7 @@ const TripDetail = () => {
     fetchBalances();
     fetchSettlements();
     fetchCurrencies();
+    fetchLinkedPlan();
   }, [tripId]);
 
   const fetchTrip = async () => {
@@ -177,6 +182,17 @@ const TripDetail = () => {
       setCurrencies(response.data);
     } catch (error) {
       console.error("Error fetching currencies:", error);
+    }
+  };
+
+  const fetchLinkedPlan = async () => {
+    try {
+      const response = await axios.get(`${API}/trips/${tripId}/plan`, {
+        withCredentials: true,
+      });
+      setLinkedPlan(response.data);
+    } catch (error) {
+      console.error("Error fetching linked plan:", error);
     }
   };
 
@@ -1246,6 +1262,14 @@ const TripDetail = () => {
               <RefreshCw className="w-4 h-4 mr-2" />
               Settlement Summary
             </TabsTrigger>
+            <TabsTrigger
+              value="plan"
+              className="rounded-full data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              data-testid="plan-tab"
+            >
+              <Map className="w-4 h-4 mr-2" />
+              Trip Plan
+            </TabsTrigger>
           </TabsList>
 
           {/* Expenses Tab */}
@@ -1512,6 +1536,56 @@ const TripDetail = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Trip Plan Tab */}
+          <TabsContent value="plan" className="space-y-4">
+            {linkedPlan ? (
+              <div className="bg-card border border-border rounded-xl p-6">
+                <div className="flex items-center justify-end mb-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await axios.delete(`${API}/trips/${tripId}/plan`, {
+                          withCredentials: true
+                        });
+                        setLinkedPlan(null);
+                        toast.success("Plan unlinked from trip");
+                      } catch (error) {
+                        toast.error("Failed to unlink plan");
+                      }
+                    }}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Unlink Plan
+                  </Button>
+                </div>
+                <PlanViewer plan={linkedPlan} />
+
+
+              </div>
+            ) : (
+              <div className="bg-card border border-border rounded-xl p-12 text-center">
+                <Map className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-heading text-xl font-bold mb-2">No Plan Linked</h3>
+                <p className="text-muted-foreground mb-6">
+                  Generate a trip plan or link an existing one
+                </p>
+
+                <div className="flex gap-3 justify-center flex-wrap">
+                  <Button
+                    onClick={() => navigate(`/planner?trip=${tripId}&name=${encodeURIComponent(trip.name)}`)}
+                    className="btn-glow"
+                  >
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Generate Plan for This Trip
+                  </Button>
+                </div>
               </div>
             )}
           </TabsContent>

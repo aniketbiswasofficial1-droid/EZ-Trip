@@ -205,6 +205,39 @@ class SettlementEntry(BaseModel):
     created_by: str
     created_at: datetime
 
+# Trip Plan Models
+class TripPlan(BaseModel):
+    destination: str
+    start_date: str
+    end_date: str
+    num_days: Optional[int] = None
+    num_travelers: Optional[int] = None
+    itinerary: List[Dict]
+    best_time_to_visit: Optional[str] = None
+    weather_summary: Optional[str] = None
+    cost_breakdown: Optional[Dict] = None
+    departure_transport_details: Optional[Dict] = None
+    return_transport_details: Optional[Dict] = None
+    travel_tips: Optional[List[str]] = []
+    packing_suggestions: Optional[List[str]] = []
+    packing_suggestions_detailed: Optional[List[Dict]] = []
+    local_customs: Optional[List[str]] = []
+    emergency_contacts: Optional[Dict] = None
+
+class SavedTripPlan(BaseModel):
+    plan_id: str
+    destination: str
+    start_date: str
+    end_date: str
+    itinerary: List[Dict]
+    weather_forecast: Optional[Dict] = None
+    cost_estimates: Optional[Dict] = None
+    created_at: str
+    linked_to_trip: Optional[str] = None
+
+class LinkPlanRequest(BaseModel):
+    plan_id: str
+
 # ========================
 # AUTH HELPERS
 # ========================
@@ -2217,6 +2250,202 @@ async def get_user_plans(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Failed to fetch trip plans")
 
 # ========================
+# USER TRIP PLANS ROUTES
+# ========================
+
+user_plans_router = APIRouter(prefix="/user/plans", tags=["user-plans"])
+
+@user_plans_router.post("")
+async def save_trip_plan(plan: TripPlan, user: dict = Depends(get_current_user)):
+    """Save a trip plan to user's profile"""
+    try:
+        plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+        saved_plan = {
+            "plan_id": plan_id,
+            "destination": plan.destination,
+            "start_date": plan.start_date,
+            "end_date": plan.end_date,
+            "num_days": plan.num_days,
+            "num_travelers": plan.num_travelers,
+            "itinerary": plan.itinerary,
+            "best_time_to_visit": plan.best_time_to_visit,
+            "weather_summary": plan.weather_summary,
+            "cost_breakdown": plan.cost_breakdown,
+            "departure_transport_details": plan.departure_transport_details,
+            "return_transport_details": plan.return_transport_details,
+            "travel_tips": plan.travel_tips,
+            "packing_suggestions": plan.packing_suggestions,
+            "packing_suggestions_detailed": plan.packing_suggestions_detailed,
+            "local_customs": plan.local_customs,
+            "emergency_contacts": plan.emergency_contacts,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "linked_to_trip": None
+        }
+        
+        # Initialize trip_plans array if it doesn't exist
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$setOnInsert": {"trip_plans": []}},
+            upsert=False
+        )
+        
+        # Add the plan
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$push": {"trip_plans": saved_plan}}
+        )
+        
+        logger.info(f"User {user['user_id']} saved trip plan {plan_id}")
+        return {"plan_id": plan_id, "message": "Plan saved successfully"}
+    except Exception as e:
+        logger.error(f"Error saving trip plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save trip plan")
+
+@user_plans_router.get("")
+async def get_user_plans(user: dict = Depends(get_current_user)):
+    """Get all saved trip plans for the current user"""
+    try:
+        user_data = await db.users.find_one(
+            {"user_id": user["user_id"]},
+            {"trip_plans": 1}
+        )
+        return user_data.get("trip_plans", []) if user_data else []
+    except Exception as e:
+        logger.error(f"Error fetching user plans: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch plans")
+
+@user_plans_router.delete("/{plan_id}")
+async def delete_trip_plan(plan_id: str, user: dict = Depends(get_current_user)):
+    """Delete a saved trip plan"""
+    try:
+        result = await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$pull": {"trip_plans": {"plan_id": plan_id}}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        
+        logger.info(f"User {user['user_id']} deleted trip plan {plan_id}")
+        return {"message": "Plan deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting trip plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to delete plan")
+
+@trips_router.post("/{trip_id}/link-plan")
+async def link_plan_to_trip(
+    trip_id: str,
+    request: LinkPlanRequest,
+    user: dict = Depends(get_current_user)
+):
+    """Link a saved trip plan to a specific trip"""
+    try:
+        # Verify user is a member of the trip
+        trip = await db.trips.find_one({
+            "trip_id": trip_id,
+            "members.user_id": user["user_id"]
+        })
+        
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found or access denied")
+        
+        # Update trip with linked plan
+        await db.trips.update_one(
+            {"trip_id": trip_id},
+            {"$set": {"linked_plan_id": request.plan_id}}
+        )
+        
+        # Update plan's linked_to_trip field in user's plans
+        await db.users.update_one(
+            {
+                "user_id": user["user_id"],
+                "trip_plans.plan_id": request.plan_id
+            },
+            {"$set": {"trip_plans.$.linked_to_trip": trip_id}}
+        )
+        
+        logger.info(f"Linked plan {request.plan_id} to trip {trip_id}")
+        return {"message": "Plan linked to trip successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error linking plan to trip: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to link plan")
+
+@trips_router.get("/{trip_id}/plan")
+async def get_trip_plan(trip_id: str, user: dict = Depends(get_current_user)):
+    """Get the trip plan linked to a specific trip"""
+    try:
+        trip = await db.trips.find_one({
+            "trip_id": trip_id,
+            "members.user_id": user["user_id"]
+        })
+        
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found or access denied")
+        
+        if not trip.get("linked_plan_id"):
+            return None
+        
+        # Find the plan in user's saved plans
+        user_data = await db.users.find_one(
+            {"user_id": user["user_id"]},
+            {"trip_plans": 1}
+        )
+        
+        if not user_data:
+            return None
+        
+        plan = next((p for p in user_data.get("trip_plans", [])
+                    if p["plan_id"] == trip["linked_plan_id"]), None)
+        return plan
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching trip plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to fetch trip plan")
+
+@trips_router.delete("/{trip_id}/plan")
+async def unlink_trip_plan(trip_id: str, user: dict = Depends(get_current_user)):
+    """Unlink a plan from a trip (doesn't delete the plan)"""
+    try:
+        trip = await db.trips.find_one({
+            "trip_id": trip_id,
+            "members.user_id": user["user_id"]
+        })
+        
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip not found or access denied")
+        
+        plan_id = trip.get("linked_plan_id")
+        
+        # Remove linked_plan_id from trip
+        await db.trips.update_one(
+            {"trip_id": trip_id},
+            {"$unset": {"linked_plan_id": ""}}
+        )
+        
+        # Update plan's linked_to_trip field
+        if plan_id:
+            await db.users.update_one(
+                {
+                    "user_id": user["user_id"],
+                    "trip_plans.plan_id": plan_id
+                },
+                {"$set": {"trip_plans.$.linked_to_trip": None}}
+            )
+        
+        logger.info(f"Unlinked plan from trip {trip_id}")
+        return {"message": "Plan unlinked from trip"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error unlinking plan: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to unlink plan")
+
+# ========================
 # INCLUDE ROUTERS
 # ========================
 
@@ -2227,6 +2456,7 @@ api_router.include_router(refunds_router)
 api_router.include_router(settlements_router)
 api_router.include_router(planner_router)
 api_router.include_router(admin_router)
+api_router.include_router(user_plans_router)
 
 @api_router.get("/")
 async def root():

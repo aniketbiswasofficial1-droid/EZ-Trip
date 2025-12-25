@@ -38,7 +38,11 @@ import {
   MapPin,
   Sparkles,
   Shield,
+  Map,
+  Trash2,
+  Link2,
 } from "lucide-react";
+import { PlanViewer } from "@/components/PlanViewer";
 
 const TRIP_COVERS = [
   "https://images.unsplash.com/photo-1628584547352-70ec34799bc1?crop=entropy&cs=srgb&fm=jpg&q=85&w=400",
@@ -53,6 +57,8 @@ const Dashboard = () => {
   const [trips, setTrips] = useState([]);
   const [currencies, setCurrencies] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [savedPlans, setSavedPlans] = useState([]);
+  const [selectedPlan, setSelectedPlan] = useState(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [newTrip, setNewTrip] = useState({
@@ -66,6 +72,7 @@ const Dashboard = () => {
     fetchTrips();
     fetchCurrencies();
     checkAdminStatus();
+    fetchSavedPlans();
   }, []);
 
   const checkAdminStatus = async () => {
@@ -99,6 +106,17 @@ const Dashboard = () => {
       setCurrencies(response.data);
     } catch (error) {
       console.error("Error fetching currencies:", error);
+    }
+  };
+
+  const fetchSavedPlans = async () => {
+    try {
+      const response = await axios.get(`${API}/user/plans`, {
+        withCredentials: true,
+      });
+      setSavedPlans(response.data || []);
+    } catch (error) {
+      console.error("Error fetching saved plans:", error);
     }
   };
 
@@ -218,9 +236,8 @@ const Dashboard = () => {
           <div className="bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
             <p className="text-sm text-muted-foreground mb-1">Overall Balance</p>
             <p
-              className={`font-heading text-3xl font-bold ${
-                totalBalance >= 0 ? "balance-positive" : "balance-negative"
-              }`}
+              className={`font-heading text-3xl font-bold ${totalBalance >= 0 ? "balance-positive" : "balance-negative"
+                }`}
               data-testid="overall-balance"
             >
               {totalBalance >= 0 ? "+" : ""}
@@ -244,7 +261,7 @@ const Dashboard = () => {
           </div>
 
           {/* AI Trip Planner Card */}
-          <div 
+          <div
             onClick={() => navigate("/planner")}
             className="bg-gradient-to-br from-primary/20 to-primary/5 border border-primary/30 rounded-xl p-6 animate-fade-in opacity-0 cursor-pointer card-hover"
             data-testid="ai-planner-card"
@@ -336,11 +353,10 @@ const Dashboard = () => {
                           onClick={() =>
                             setNewTrip({ ...newTrip, cover_image: cover })
                           }
-                          className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${
-                            newTrip.cover_image === cover
-                              ? "border-primary"
-                              : "border-transparent hover:border-border"
-                          }`}
+                          className={`aspect-square rounded-lg overflow-hidden border-2 transition-colors ${newTrip.cover_image === cover
+                            ? "border-primary"
+                            : "border-transparent hover:border-border"
+                            }`}
                         >
                           <img
                             src={cover}
@@ -449,11 +465,10 @@ const Dashboard = () => {
                           Your balance
                         </p>
                         <p
-                          className={`font-heading text-lg font-bold ${
-                            trip.your_balance >= 0
-                              ? "balance-positive"
-                              : "balance-negative"
-                          }`}
+                          className={`font-heading text-lg font-bold ${trip.your_balance >= 0
+                            ? "balance-positive"
+                            : "balance-negative"
+                            }`}
                         >
                           {trip.your_balance >= 0 ? "+" : ""}
                           {getCurrencySymbol(trip.currency)}
@@ -496,6 +511,130 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+
+        {/* My Saved Plans Section */}
+        <div className="space-y-6 mt-12 animate-slide-up">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-heading text-2xl font-bold">My Trip Plans</h2>
+              <p className="text-muted-foreground">AI-generated plans you've saved</p>
+            </div>
+            <Button onClick={() => navigate("/planner")} variant="outline">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Create New Plan
+            </Button>
+          </div>
+
+          {savedPlans.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {savedPlans.map((plan) => (
+                <div
+                  key={plan.plan_id}
+                  className="bg-card border border-border rounded-xl p-6 card-hover animate-fade-in opacity-0 cursor-pointer"
+                  onClick={() => setSelectedPlan(plan)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start gap-3">
+                      <Map className="w-5 h-5 text-primary mt-1" />
+                      <div>
+                        <h3 className="font-heading font-bold">{plan.destination}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {plan.start_date} - {plan.end_date}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive h-8 w-8"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await axios.delete(`${API}/user/plans/${plan.plan_id}`, {
+                            withCredentials: true,
+                          });
+                          setSavedPlans(savedPlans.filter(p => p.plan_id !== plan.plan_id));
+                          toast.success("Plan deleted");
+                        } catch (error) {
+                          toast.error("Failed to delete plan");
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+
+                  {plan.itinerary && plan.itinerary.length > 0 && (
+                    <div className="mb-4 text-sm text-muted-foreground">
+                      {plan.itinerary.length} days planned
+                    </div>
+                  )}
+
+                  {plan.linked_to_trip ? (
+                    <div className="flex items-center gap-2 text-sm text-primary">
+                      <Link2 className="w-4 h-4" />
+                      Linked to a trip
+                    </div>
+                  ) : (
+                    <Select
+                      value=""
+                      onOpenChange={(open) => {
+                        if (!open) return;
+                      }}
+                      onValueChange={async (tripId) => {
+                        if (!tripId) return;
+
+                        try {
+                          await axios.post(
+                            `${API}/trips/${tripId}/link-plan`,
+                            { plan_id: plan.plan_id },
+                            { withCredentials: true }
+                          );
+                          toast.success("Plan linked to trip!");
+                          fetchSavedPlans();
+                        } catch (error) {
+                          toast.error("Failed to link plan");
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-12">
+                        <SelectValue placeholder="Link to a trip..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {trips.map((trip) => (
+                          <SelectItem key={trip.trip_id} value={trip.trip_id}>
+                            {trip.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card border border-border rounded-xl p-12 text-center">
+              <Map className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <h3 className="font-heading text-xl font-bold mb-2">No Plans Saved Yet</h3>
+              <p className="text-muted-foreground mb-6">
+                Generate trip plans with AI and save them here for easy access
+              </p>
+              <Button onClick={() => navigate("/planner")} className="btn-glow">
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate Your First Plan
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* Plan Viewer Dialog */}
+        <Dialog open={!!selectedPlan} onOpenChange={() => setSelectedPlan(null)}>
+          <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto top-[5%] translate-y-0">
+            {selectedPlan && (
+              <PlanViewer plan={selectedPlan} />
+            )}
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

@@ -230,15 +230,17 @@ const AuthModal = ({ isOpen, onClose, defaultTab = "login" }) => {
               </div>
             </div>
 
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4">
               <GoogleLogin
                 onSuccess={handleGoogleSuccess}
                 onError={handleGoogleError}
-                theme="filled_blue"
+                theme="outline"
                 size="large"
                 text={activeTab === "login" ? "signin_with" : "signup_with"}
                 width="100%"
                 logo_alignment="left"
+                type="standard"
+                shape="rectangular"
               />
             </div>
           </div>

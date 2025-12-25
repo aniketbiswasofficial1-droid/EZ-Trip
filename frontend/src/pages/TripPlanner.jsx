@@ -165,8 +165,27 @@ const TripPlanner = () => {
 
     setSaving(true);
     try {
-      await axios.post(`${API}/planner/save`, plan, { withCredentials: true });
-      toast.success("Trip plan saved!");
+      const planData = {
+        destination: plan.destination,
+        start_date: plan.start_date,
+        end_date: plan.end_date,
+        num_days: plan.num_days,
+        num_travelers: plan.num_travelers,
+        itinerary: plan.itinerary || [],
+        best_time_to_visit: plan.best_time_to_visit || "",
+        weather_summary: plan.weather_summary || "",
+        cost_breakdown: plan.cost_breakdown || null,
+        departure_transport_details: plan.departure_transport_details || null,
+        return_transport_details: plan.return_transport_details || null,
+        travel_tips: plan.travel_tips || [],
+        packing_suggestions: plan.packing_suggestions || [],
+        packing_suggestions_detailed: plan.packing_suggestions_detailed || [],
+        local_customs: plan.local_customs || [],
+        emergency_contacts: plan.emergency_contacts || {},
+      };
+
+      await axios.post(`${API}/user/plans`, planData, { withCredentials: true });
+      toast.success("Trip plan saved to your profile!");
     } catch (error) {
       console.error("Error saving plan:", error);
       toast.error("Failed to save plan");
@@ -335,8 +354,8 @@ const TripPlanner = () => {
               {/* Travelers */}
               <div className="space-y-2">
                 <Label>Number of travelers</Label>
-                <div className="flex items-center gap-4">
-                  <Users className="w-5 h-5 text-muted-foreground" />
+                <div className="relative flex items-center h-12 border border-border rounded-lg bg-background px-3 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background">
+                  <Users className="w-5 h-5 text-muted-foreground mr-3" />
                   <Input
                     type="number"
                     min={1}
@@ -347,10 +366,10 @@ const TripPlanner = () => {
                       // If empty, set to empty string. Otherwise, parse as integer.
                       setNumTravelers(val === "" ? "" : parseInt(val));
                     }}
-                    className="w-24 h-12"
+                    className="border-0 h-auto p-0 w-20 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
                     data-testid="travelers-input"
                   />
-                  <span className="text-muted-foreground">
+                  <span className="text-muted-foreground ml-2">
                     {numTravelers === 1 ? "traveler" : "travelers"}
                   </span>
                 </div>
