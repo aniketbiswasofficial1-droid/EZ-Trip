@@ -38,6 +38,7 @@ import {
   MapPin,
   Calendar as CalendarIcon,
   Users,
+  User,
   Plane,
   Train,
   Bus,
@@ -54,6 +55,7 @@ import {
   LogOut,
   Save,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { format, addDays } from "date-fns";
 
@@ -234,6 +236,19 @@ const TripPlanner = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
+              <div className="px-3 py-2">
+                <p className="text-sm font-medium">{user?.name}</p>
+                <p className="text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate("/profile")}>
+                <User className="w-4 h-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate("/dashboard")}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Trip
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate("/dashboard")}>
                 <Wallet className="w-4 h-4 mr-2" />
                 Dashboard

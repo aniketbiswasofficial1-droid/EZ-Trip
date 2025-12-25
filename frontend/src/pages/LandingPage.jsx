@@ -103,7 +103,7 @@ const LandingPage = () => {
             <div className="space-y-8 animate-fade-in">
               <div className="inline-flex items-center gap-2 bg-secondary/50 px-4 py-2 rounded-full border border-border">
                 <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
-                <span className="text-sm text-muted-foreground">Free forever for personal use</span>
+                <span className="text-sm text-muted-foreground">Free for personal use</span>
               </div>
 
               <h1 className="font-heading text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
@@ -161,9 +161,9 @@ const LandingPage = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-medium">Hotel Booking</p>
-                        <p className="text-sm text-muted-foreground">Paid by Alex</p>
+                        <p className="text-sm text-muted-foreground">Paid by Rahul</p>
                       </div>
-                      <p className="font-heading text-xl font-bold">$420</p>
+                      <p className="font-heading text-xl font-bold">₹15,000</p>
                     </div>
                     <div className="flex gap-2 mt-3">
                       <span className="text-xs bg-secondary px-2 py-1 rounded-full">Split: 3 people</span>
@@ -175,11 +175,11 @@ const LandingPage = () => {
                     <div className="flex justify-between items-start mb-2">
                       <div>
                         <p className="font-medium">Restaurant Dinner</p>
-                        <p className="text-sm text-muted-foreground">Paid by Sarah</p>
+                        <p className="text-sm text-muted-foreground">Paid by Priya</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-heading text-xl font-bold">$85</p>
-                        <p className="text-xs text-primary">$15 refunded</p>
+                        <p className="font-heading text-xl font-bold">₹2,500</p>
+                        <p className="text-xs text-primary">₹500 refunded</p>
                       </div>
                     </div>
                   </div>
@@ -188,7 +188,7 @@ const LandingPage = () => {
                   <div className="pt-4 border-t border-border">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Your balance</span>
-                      <span className="font-heading text-2xl font-bold text-primary">+$52.50</span>
+                      <span className="font-heading text-2xl font-bold text-primary">+₹1,500</span>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">You are owed money</p>
                   </div>
@@ -329,7 +329,7 @@ const LandingPage = () => {
                 <div className="mt-4 pt-4 border-t border-border">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Estimated Budget</span>
-                    <span className="font-heading font-bold text-primary">$850 - $1,200</span>
+                    <span className="font-heading font-bold text-primary">₹25,000 - ₹40,000</span>
                   </div>
                 </div>
               </div>

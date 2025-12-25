@@ -12,6 +12,7 @@ import Dashboard from "@/pages/Dashboard";
 import TripDetail from "@/pages/TripDetail";
 import TripPlanner from "@/pages/TripPlanner";
 import AdminPanel from "@/pages/AdminPanel";
+import Profile from "@/pages/Profile";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
@@ -111,6 +112,19 @@ const AuthProvider = ({ children }) => {
     }
   };
 
+  const refreshUser = async () => {
+    try {
+      const response = await axios.get(`${API}/auth/me`, {
+        withCredentials: true
+      });
+      setUser(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Refresh user error:", error);
+      setUser(null);
+    }
+  };
+
   useEffect(() => {
     checkAuth();
   }, []);
@@ -125,7 +139,8 @@ const AuthProvider = ({ children }) => {
       loginWithGoogle,
       register,
       logout,
-      checkAuth
+      checkAuth,
+      refreshUser
     }}>
       {children}
     </AuthContext.Provider>
@@ -254,6 +269,14 @@ function AppRouter() {
         element={
           <ProtectedRoute>
             <AdminPanel />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         }
       />

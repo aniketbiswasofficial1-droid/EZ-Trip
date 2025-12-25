@@ -1,9 +1,11 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends, UploadFile, File
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
+import io
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
@@ -17,6 +19,8 @@ from trip_planner import trip_planner, TripPlanRequest, TripPlanResponse
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from email_service import EmailService
+from PIL import Image
+import shutil
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -25,6 +29,14 @@ load_dotenv(ROOT_DIR / '.env')
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/eztrip')
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ.get('DB_NAME', 'eztrip_db')]
+
+# Create uploads directory
+UPLOAD_DIR = ROOT_DIR / "uploads" / "profile-pictures"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+# Allowed image types and max size
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 # Create the main app
 app = FastAPI()
@@ -86,16 +98,25 @@ class UserBase(BaseModel):
     email: str
     name: str
     picture: Optional[str] = None
-    default_currency: str = "USD"
+    custom_profile_picture: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    default_currency: str = "INR"
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    date_of_birth: Optional[str] = None
+    custom_profile_picture: Optional[str] = None
     default_currency: Optional[str] = None
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
 
 class TripCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    currency: str = "USD"
+    currency: str = "INR"
     cover_image: Optional[str] = None
 
 class TripMember(BaseModel):
@@ -345,7 +366,7 @@ async def register(user_data: UserRegister, response: Response):
             "password_hash": hashed_password, 
             "name": user_data.name,
             "picture": f"https://api.dicebear.com/7.x/initials/svg?seed={user_data.name}", 
-            "default_currency": "USD",
+            "default_currency": "INR",
             "created_at": datetime.now(timezone.utc).isoformat()
         }
         
@@ -420,6 +441,9 @@ async def get_me(user: dict = Depends(get_current_user)):
     """Get current authenticated user"""
     # Don't send password hash back
     user.pop("password_hash", None)
+    # Return custom profile picture if available, otherwise OAuth picture
+    if user.get("custom_profile_picture"):
+        user["picture"] = user["custom_profile_picture"]
     return user
 
 @auth_router.post("/logout")
@@ -598,7 +622,7 @@ async def google_auth(auth_data: GoogleAuthRequest, response: Response):
                 "picture": picture,
                 "oauth_provider": "google",
                 "oauth_id": google_id,
-                "default_currency": "USD",
+                "default_currency": "INR",
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.users.insert_one(new_user)
@@ -642,7 +666,7 @@ async def update_user(
     update: UserUpdate,
     user: dict = Depends(get_current_user)
 ):
-    """Update user preferences"""
+    """Update user profile"""
     update_data = {k: v for k, v in update.model_dump().items() if v is not None}
     
     if update_data:
@@ -650,6 +674,16 @@ async def update_user(
             {"user_id": user["user_id"]},
             {"$set": update_data}
         )
+        
+        # If name or picture changed, update in all trips
+        if "name" in update_data or "custom_profile_picture" in update_data:
+            updated_user = await db.users.find_one({"user_id": user["user_id"]})
+            display_picture = updated_user.get("custom_profile_picture") or updated_user.get("picture", "")
+            await update_user_in_all_trips(
+                user["user_id"], 
+                update_data.get("name", user["name"]),
+                display_picture
+            )
     
     updated_user = await db.users.find_one(
         {"user_id": user["user_id"]},
@@ -657,8 +691,109 @@ async def update_user(
     )
     if updated_user:
         updated_user.pop("password_hash", None)
+        # Return custom profile picture if available, otherwise OAuth picture
+        if updated_user.get("custom_profile_picture"):
+            updated_user["picture"] = updated_user["custom_profile_picture"]
         
     return updated_user
+
+@auth_router.post("/upload-profile-picture")
+async def upload_profile_picture(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    """Upload a profile picture"""
+    try:
+        # Validate file extension
+        file_ext = Path(file.filename).suffix.lower()
+        if file_ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Invalid file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        
+        # Read file content
+        content = await file.read()
+        
+        # Validate file size
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File too large. Maximum size: {MAX_FILE_SIZE / 1024 / 1024}MB"
+            )
+        
+        # Validate it's actually an image using Pillow
+        try:
+            image = Image.open(io.BytesIO(content))
+            image.verify()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+        
+        # Generate unique filename
+        unique_filename = f"{uuid.uuid4().hex}{file_ext}"
+        file_path = UPLOAD_DIR / unique_filename
+        
+        # Save file
+        with open(file_path, "wb") as f:
+            f.write(content)
+        
+        # Return URL
+        file_url = f"/api/auth/uploads/profile-pictures/{unique_filename}"
+        
+        return {"url": file_url, "filename": unique_filename}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error uploading profile picture: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to upload image")
+
+@auth_router.post("/change-password")
+async def change_password(
+    password_data: PasswordChange,
+    user: dict = Depends(get_current_user)
+):
+    """Change password for non-OAuth users"""
+    # Check if user has a password (not OAuth user)
+    if not user.get("password_hash"):
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot change password for OAuth users"
+        )
+    
+    # Verify current password
+    if not verify_password(password_data.current_password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+    
+    # Validate new password
+    validate_strong_password(password_data.new_password)
+    
+    # Hash new password
+    new_hash = get_password_hash(password_data.new_password)
+    
+    # Update password
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"password_hash": new_hash}}
+    )
+    
+    return {"message": "Password updated successfully"}
+
+# Serve uploaded profile pictures
+@auth_router.get("/uploads/profile-pictures/{filename}")
+async def serve_profile_picture(filename: str):
+    """Serve uploaded profile picture"""
+    file_path = UPLOAD_DIR / filename
+    
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    # Validate filename to prevent directory traversal
+    if ".." in filename or "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    return FileResponse(file_path)
+
 
 # ========================
 # TRIPS ROUTES
@@ -1565,10 +1700,10 @@ async def update_refund(
 # ========================
 
 SUPPORTED_CURRENCIES = [
+    {"code": "INR", "symbol": "\u20b9", "name": "Indian Rupee"},
     {"code": "USD", "symbol": "$", "name": "US Dollar"},
     {"code": "EUR", "symbol": "\u20ac", "name": "Euro"},
     {"code": "GBP", "symbol": "\u00a3", "name": "British Pound"},
-    {"code": "INR", "symbol": "\u20b9", "name": "Indian Rupee"},
     {"code": "JPY", "symbol": "\u00a5", "name": "Japanese Yen"},
     {"code": "AUD", "symbol": "A$", "name": "Australian Dollar"},
     {"code": "CAD", "symbol": "C$", "name": "Canadian Dollar"},
@@ -1753,7 +1888,7 @@ async def init_admin_defaults():
             "setting_id": "main",
             "llm_provider": "openai",
             "llm_model": "gpt-4o",
-            "default_currency": "USD",
+            "default_currency": "INR",
             "maintenance_mode": False,
             "registration_enabled": True,
             "ai_planner_enabled": True,
@@ -2001,7 +2136,7 @@ async def get_app_settings(user: dict = Depends(get_admin_user)):
             "setting_id": "main",
             "llm_provider": "openai",
             "llm_model": "gpt-4o",
-            "default_currency": "USD",
+            "default_currency": "INR",
             "maintenance_mode": False,
             "registration_enabled": True,
             "ai_planner_enabled": True,

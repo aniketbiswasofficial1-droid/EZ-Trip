@@ -32,6 +32,7 @@ import {
   Wallet,
   Plus,
   Users,
+  User,
   LogOut,
   ChevronRight,
   Globe,
@@ -64,7 +65,7 @@ const Dashboard = () => {
   const [newTrip, setNewTrip] = useState({
     name: "",
     description: "",
-    currency: "USD",
+    currency: "INR",
     cover_image: TRIP_COVERS[0],
   });
 
@@ -136,7 +137,7 @@ const Dashboard = () => {
       setNewTrip({
         name: "",
         description: "",
-        currency: "USD",
+        currency: "INR",
         cover_image: TRIP_COVERS[Math.floor(Math.random() * TRIP_COVERS.length)],
       });
       toast.success("Trip created successfully!");
@@ -189,6 +190,20 @@ const Dashboard = () => {
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
               <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => navigate("/profile")}
+                data-testid="profile-menu-btn"
+              >
+                <User className="w-4 h-4 mr-2" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => setCreateDialogOpen(true)}
+                data-testid="create-trip-menu-btn"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Create New Trip
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => navigate("/planner")}
                 data-testid="planner-menu-btn"

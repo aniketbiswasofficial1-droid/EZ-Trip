@@ -86,7 +86,7 @@ const TripDetail = () => {
   const [newExpense, setNewExpense] = useState({
     description: "",
     total_amount: "",
-    currency: "USD",
+    currency: "INR",
     category: "general",
     payers: [],
     splits: [],
@@ -346,7 +346,7 @@ const TripDetail = () => {
     setNewExpense({
       description: "",
       total_amount: "",
-      currency: trip?.currency || "USD",
+      currency: trip?.currency || "INR",
       category: "general",
       payers: [],
       splits: defaultSplits,
