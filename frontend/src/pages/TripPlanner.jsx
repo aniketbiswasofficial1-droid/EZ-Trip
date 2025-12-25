@@ -277,173 +277,53 @@ const TripPlanner = () => {
             </div>
 
             <div className="bg-card border border-border rounded-xl p-6 space-y-6 animate-slide-up">
-              {/* Destination */}
-              <div className="space-y-2">
-                <Label htmlFor="destination">Where do you want to go?</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="destination"
-                    placeholder="Paris, France"
-                    value={destination}
-                    onChange={(e) => {
-                      setDestination(e.target.value);
-                      if (errors.destination) setErrors({ ...errors, destination: null });
-                    }}
-                    className={`pl-10 h-12 ${errors.destination ? 'border-destructive' : ''}`}
-                    data-testid="destination-input"
-                  />
-                </div>
-                {errors.destination && (
-                  <p className="text-sm text-destructive">{errors.destination}</p>
-                )}
-              </div>
-
-              {/* Date Range - Separate Inputs */}
-              <div className="space-y-2">
-                <Label>When are you traveling?</Label>
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Start Date */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Start Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left h-12"
-                          data-testid="start-date-btn"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                          {startDate ? format(startDate, "MMM d, yyyy") : "Select"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={startDate}
-                          onSelect={(date) => {
-                            setStartDate(date);
-                            // Auto-adjust end date if needed
-                            if (date && endDate && date > endDate) {
-                              setEndDate(addDays(date, 1));
-                            }
-                          }}
-                          disabled={(date) => date < new Date()}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+              {/* Destination and Departure City - Swapped Order */}
+              <div className="grid lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="departure-city">Departure City</Label>
+                  <div className="relative">
+                    <Plane className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="departure-city"
+                      placeholder="New York"
+                      value={departureCity}
+                      onChange={(e) => {
+                        setDepartureCity(e.target.value);
+                        if (errors.departureCity) setErrors({ ...errors, departureCity: null });
+                      }}
+                      className={`pl-10 h-12 ${errors.departureCity ? 'border-destructive' : ''}`}
+                      data-testid="departure-city-input"
+                    />
                   </div>
+                  {errors.departureCity && (
+                    <p className="text-sm text-destructive">{errors.departureCity}</p>
+                  )}
+                </div>
 
-                  {/* End Date */}
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">End Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left h-12"
-                          data-testid="end-date-btn"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
-                          {endDate ? format(endDate, "MMM d, yyyy") : "Select"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={endDate}
-                          onSelect={setEndDate}
-                          disabled={(date) => date < (startDate || new Date())}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
+                <div className="space-y-2">
+                  <Label htmlFor="destination">Destination</Label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="destination"
+                      placeholder="Paris, France"
+                      value={destination}
+                      onChange={(e) => {
+                        setDestination(e.target.value);
+                        if (errors.destination) setErrors({ ...errors, destination: null });
+                      }}
+                      className={`pl-10 h-12 ${errors.destination ? 'border-destructive' : ''}`}
+                      data-testid="destination-input"
+                    />
                   </div>
-                </div>
-                {errors.dates && (
-                  <p className="text-sm text-destructive">{errors.dates}</p>
-                )}
-              </div>
-
-              {/* Travelers */}
-              <div className="space-y-2">
-                <Label>Number of travelers</Label>
-                <div className="relative flex items-center h-12 border border-border rounded-lg bg-background px-3 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-background">
-                  <Users className="w-5 h-5 text-muted-foreground mr-3" />
-                  <Input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={numTravelers}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      // If empty, set to empty string. Otherwise, parse as integer.
-                      setNumTravelers(val === "" ? "" : parseInt(val));
-                    }}
-                    className="border-0 h-auto p-0 w-20 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-                    data-testid="travelers-input"
-                  />
-                  <span className="text-muted-foreground ml-2">
-                    {numTravelers === 1 ? "traveler" : "travelers"}
-                  </span>
+                  {errors.destination && (
+                    <p className="text-sm text-destructive">{errors.destination}</p>
+                  )}
                 </div>
               </div>
 
-              {/* Budget */}
-              <div className="space-y-2">
-                <Label>Budget preference</Label>
-                <Select value={budgetPreference} onValueChange={setBudgetPreference}>
-                  <SelectTrigger className="h-12" data-testid="budget-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="budget">Budget-friendly</SelectItem>
-                    <SelectItem value="moderate">Moderate</SelectItem>
-                    <SelectItem value="luxury">Luxury</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Currency */}
-              <div className="space-y-2">
-                <Label>Currency</Label>
-                <Select value={currency} onValueChange={setCurrency}>
-                  <SelectTrigger className="h-12" data-testid="currency-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="INR">₹ INR - Indian Rupee</SelectItem>
-                    <SelectItem value="USD">$ USD - US Dollar</SelectItem>
-                    <SelectItem value="EUR">€ EUR - Euro</SelectItem>
-                    <SelectItem value="GBP">£ GBP - British Pound</SelectItem>
-                    <SelectItem value="AUD">A$ AUD - Australian Dollar</SelectItem>
-                    <SelectItem value="SGD">S$ SGD - Singapore Dollar</SelectItem>
-                    <SelectItem value="THB">฿ THB - Thai Baht</SelectItem>
-                    <SelectItem value="JPY">¥ JPY - Japanese Yen</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Accommodation */}
-              <div className="space-y-2">
-                <Label>Accommodation type</Label>
-                <Select value={accommodationType} onValueChange={setAccommodationType}>
-                  <SelectTrigger className="h-12" data-testid="accommodation-select">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hostel">Hostel</SelectItem>
-                    <SelectItem value="hotel">Hotel</SelectItem>
-                    <SelectItem value="airbnb">Airbnb/Vacation Rental</SelectItem>
-                    <SelectItem value="resort">Resort</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Transport Selection */}
+              {/* Transportation Selection */}
               <div className="space-y-4">
-                <Label>Transportation</Label>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs text-muted-foreground">Departure Transport</Label>
@@ -474,24 +354,169 @@ const TripPlanner = () => {
                     </Select>
                   </div>
                 </div>
-                {(departureTransport !== "none" || returnTransport !== "none") && (
-                  <div className="relative animate-fade-in">
-                    <Plane className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      placeholder="Departure city (e.g., New York)"
-                      value={departureCity}
-                      onChange={(e) => {
-                        setDepartureCity(e.target.value);
-                        if (errors.departureCity) setErrors({ ...errors, departureCity: null });
-                      }}
-                      className={`pl-10 h-12 ${errors.departureCity ? 'border-destructive' : ''}`}
-                      data-testid="departure-city-input"
-                    />
-                    {errors.departureCity && (
-                      <p className="text-sm text-destructive mt-1">{errors.departureCity}</p>
-                    )}
+              </div>
+
+              {/* Date Range */}
+              <div className="space-y-2">
+                <Label>Travel Dates</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Start Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left h-12"
+                          data-testid="start-date-btn"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {startDate ? format(startDate, "MMM d, yyyy") : "Select"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={startDate}
+                          onSelect={(date) => {
+                            setStartDate(date);
+                            if (date && endDate && date > endDate) {
+                              setEndDate(addDays(date, 1));
+                            }
+                          }}
+                          disabled={(date) => date < new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
+
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">End Date</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left h-12"
+                          data-testid="end-date-btn"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />
+                          {endDate ? format(endDate, "MMM d, yyyy") : "Select"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={endDate}
+                          onSelect={setEndDate}
+                          disabled={(date) => date < (startDate || new Date())}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+                {errors.dates && (
+                  <p className="text-sm text-destructive">{errors.dates}</p>
                 )}
+              </div>
+
+              {/* Preferences Grid - Row 1: Travelers & Currency */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Travelers */}
+                <div className="space-y-2">
+                  <Label>Number of Travelers</Label>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 shrink-0 rounded-full"
+                      onClick={() => setNumTravelers(Math.max(1, (numTravelers || 1) - 1))}
+                      disabled={numTravelers <= 1}
+                    >
+                      <span className="text-lg">−</span>
+                    </Button>
+                    <div className="relative flex-1">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={50}
+                        value={numTravelers}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNumTravelers(val === "" ? "" : parseInt(val));
+                        }}
+                        className="h-12 text-center text-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="1"
+                        data-testid="travelers-input"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-12 w-12 shrink-0 rounded-full"
+                      onClick={() => setNumTravelers(Math.min(50, (numTravelers || 1) + 1))}
+                      disabled={numTravelers >= 50}
+                    >
+                      <span className="text-lg">+</span>
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Currency */}
+                <div className="space-y-2">
+                  <Label>Currency</Label>
+                  <Select value={currency} onValueChange={setCurrency}>
+                    <SelectTrigger className="h-12" data-testid="currency-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="INR">₹ INR</SelectItem>
+                      <SelectItem value="USD">$ USD</SelectItem>
+                      <SelectItem value="EUR">€ EUR</SelectItem>
+                      <SelectItem value="GBP">£ GBP</SelectItem>
+                      <SelectItem value="AUD">A$ AUD</SelectItem>
+                      <SelectItem value="SGD">S$ SGD</SelectItem>
+                      <SelectItem value="THB">฿ THB</SelectItem>
+                      <SelectItem value="JPY">¥ JPY</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Preferences Grid - Row 2: Budget & Accommodation */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Budget */}
+                <div className="space-y-2">
+                  <Label>Budget Preference</Label>
+                  <Select value={budgetPreference} onValueChange={setBudgetPreference}>
+                    <SelectTrigger className="h-12" data-testid="budget-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="budget">Budget-friendly</SelectItem>
+                      <SelectItem value="moderate">Moderate</SelectItem>
+                      <SelectItem value="luxury">Luxury</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Accommodation */}
+                <div className="space-y-2">
+                  <Label>Accommodation Type</Label>
+                  <Select value={accommodationType} onValueChange={setAccommodationType}>
+                    <SelectTrigger className="h-12" data-testid="accommodation-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hostel">Hostel</SelectItem>
+                      <SelectItem value="hotel">Hotel</SelectItem>
+                      <SelectItem value="airbnb">Airbnb</SelectItem>
+                      <SelectItem value="resort">Resort</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Interests */}
