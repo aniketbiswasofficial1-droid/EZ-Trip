@@ -730,9 +730,9 @@ const TripDetail = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Trip Stats */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 stagger-children">
           <div className="bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
             <p className="text-sm text-muted-foreground mb-1">Total Expenses</p>
             <p className="font-heading text-2xl font-bold" data-testid="trip-total-expenses">
@@ -793,7 +793,7 @@ const TripDetail = () => {
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-heading text-xl font-bold">Trip Members</h2>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 stagger-children">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 stagger-children">
             {trip.members.map((member) => (
               <div
                 key={member.user_id}
@@ -870,7 +870,7 @@ const TripDetail = () => {
 
         {/* Action Buttons */}
         <div className="mb-8">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {/* Add Expense Button */}
             <Dialog open={addExpenseOpen} onOpenChange={(open) => {
               setAddExpenseOpen(open);

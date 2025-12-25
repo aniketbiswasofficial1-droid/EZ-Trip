@@ -25,6 +25,11 @@ import shutil
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
+# Environment configuration
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')
+IS_PRODUCTION = ENVIRONMENT == 'production'
+DEBUG = os.getenv('DEBUG', 'true').lower() == 'true' and not IS_PRODUCTION
+
 # MongoDB connection
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017/eztrip')
 client = AsyncIOMotorClient(mongo_url)
@@ -42,19 +47,26 @@ MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 app = FastAPI()
 
 # Configure logging
+log_level = os.getenv('LOG_LEVEL', 'INFO' if IS_PRODUCTION else 'DEBUG')
 logging.basicConfig(
-    level=logging.INFO,
+    level=getattr(logging, log_level.upper()),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
+# Log startup information
+logger.info(f"Starting EZ-Trip Backend in {ENVIRONMENT} mode")
+logger.info(f"Debug mode: {DEBUG}")
+
 # GLOBAL ERROR HANDLER
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.error(f"Global error: {exc}")
+    logger.error(f"Global error: {exc}", exc_info=True if DEBUG else False)
+    # Don't expose internal error details in production
+    error_detail = str(exc) if DEBUG else "Internal server error"
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Server Error: {str(exc)}"}
+        content={"detail": error_detail}
     )
 
 # Create routers
@@ -87,6 +99,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    # Add security headers
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    if IS_PRODUCTION:
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # ========================
 # PYDANTIC MODELS
@@ -386,13 +411,13 @@ async def register(user_data: UserRegister, response: Response):
             "created_at": datetime.now(timezone.utc).isoformat()
         })
         
-        # Set cookie
+        # Set cookie with environment-aware security
         response.set_cookie(
             key="session_token",
             value=session_token,
             httponly=True,
-            secure=False,  # Set False for localhost
-            samesite="lax",
+            secure=IS_PRODUCTION,  # True in production, False in development
+            samesite="strict" if IS_PRODUCTION else "lax",
             path="/",
             max_age=7 * 24 * 60 * 60
         )
@@ -423,13 +448,13 @@ async def login(login_data: UserLogin, response: Response):
         "created_at": datetime.now(timezone.utc).isoformat()
     })
     
-    # Set cookie
+    # Set cookie with environment-aware security
     response.set_cookie(
         key="session_token",
         value=session_token,
         httponly=True,
-        secure=False, # Set False for localhost
-        samesite="lax",
+        secure=IS_PRODUCTION,  # True in production, False in development
+        samesite="strict" if IS_PRODUCTION else "lax",
         path="/",
         max_age=7 * 24 * 60 * 60
     )
@@ -457,8 +482,8 @@ async def logout(request: Request, response: Response):
     response.delete_cookie(
         key="session_token",
         path="/",
-        secure=False,
-        samesite="lax"
+        secure=IS_PRODUCTION,
+        samesite="strict" if IS_PRODUCTION else "lax"
     )
     
     return {"message": "Logged out"}
@@ -641,13 +666,13 @@ async def google_auth(auth_data: GoogleAuthRequest, response: Response):
             "created_at": datetime.now(timezone.utc).isoformat()
         })
         
-        # Set cookie
+        # Set cookie with environment-aware security
         response.set_cookie(
             key="session_token",
             value=session_token,
             httponly=True,
-            secure=False,
-            samesite="lax",
+            secure=IS_PRODUCTION,  # True in production, False in development
+            samesite="strict" if IS_PRODUCTION else "lax",
             path="/",
             max_age=7 * 24 * 60 * 60
         )

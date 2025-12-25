@@ -7,6 +7,14 @@ module.exports = {
     ],
     theme: {
         extend: {
+            screens: {
+                'xs': '375px',
+                'sm': '640px',
+                'md': '768px',
+                'lg': '1024px',
+                'xl': '1280px',
+                '2xl': '1536px',
+            },
             colors: {
                 border: "hsl(var(--border))",
                 input: "hsl(var(--input))",
@@ -48,9 +56,9 @@ module.exports = {
                 sm: "calc(var(--radius) - 4px)"
             },
             fontFamily: {
-                sans: ['Montserrat', 'sans-serif'],
-                heading: ['Montserrat', 'sans-serif'],
-                mono: ['monospace']
+                sans: ['Inter', 'sans-serif'],
+                heading: ['Inter', 'sans-serif'],
+                mono: ['JetBrains Mono', 'monospace']
             },
             keyframes: {
                 "accordion-down": {

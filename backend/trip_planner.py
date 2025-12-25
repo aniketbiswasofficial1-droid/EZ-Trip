@@ -4,11 +4,15 @@ Uses standard OpenAI API instead of Emergent wrapper.
 """
 import os
 import httpx
+import logging
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import json
 from openai import AsyncOpenAI  # Changed from emergentintegrations
+
+# Configure logger
+logger = logging.getLogger(__name__)
 
 # Models for Trip Planning (Kept exactly the same)
 class TripPlanRequest(BaseModel):
@@ -122,7 +126,7 @@ class TripPlannerService:
                         "country": result.get("country", "")
                     }
         except Exception as e:
-            print(f"Geocoding error: {e}")
+            logger.warning(f"Geocoding error for location '{location}': {e}")
         return None
 
     async def get_weather_forecast(self, latitude: float, longitude: float, start_date: str, end_date: str) -> List[WeatherData]:
@@ -164,7 +168,7 @@ class TripPlannerService:
                             weather_description=weather_codes.get(daily["weathercode"][i], "Unknown")
                         ))
         except Exception as e:
-            print(f"Weather API error: {e}")
+            logger.warning(f"Weather API error: {e}")
         
         return weather_data
 
@@ -510,7 +514,7 @@ Please provide a JSON response with this EXACT structure:
             )
             
         except Exception as e:
-            print(f"Trip planning error: {e}")
+            logger.error(f"Trip planning error: {e}", exc_info=True)
             raise ValueError("Failed to generate trip plan. Please try again.")
 
 trip_planner = TripPlannerService()

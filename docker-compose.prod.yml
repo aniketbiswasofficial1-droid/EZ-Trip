@@ -1,0 +1,141 @@
+# Production Docker Compose Configuration
+# This file is optimized for production deployment
+# DO NOT use this for local development - use docker-compose.yml instead
+
+services:
+  # MongoDB Service
+  mongodb:
+    image: mongo:latest
+    container_name: eztrip-mongodb-prod
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_prod_data:/data/db
+    networks:
+      - eztrip-prod-network
+    restart: always
+    environment:
+      # IMPORTANT: In production, enable MongoDB authentication
+      # MONGO_INITDB_ROOT_USERNAME: admin
+      # MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${DB_NAME:-production_database}
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Backend API Service (Production)
+  backend:
+    build:
+      context: ./backend
+      target: production
+    container_name: eztrip-backend-prod
+    ports:
+      - "8000:8000"
+    environment:
+      # Environment variables from .env file
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=${DB_NAME:-production_database}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USE_TLS=${SMTP_USE_TLS:-True}
+      - SMTP_USERNAME=${SMTP_USERNAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAIL_FROM_ADDRESS=${EMAIL_FROM_ADDRESS}
+      - EMAIL_FROM_NAME=${EMAIL_FROM_NAME}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-60}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    volumes:
+      # Only mount uploads directory, not entire codebase
+      - backend_uploads:/app/uploads
+    networks:
+      - eztrip-prod-network
+    restart: always
+    healthcheck:
+      test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/')" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+
+  # Frontend React Service (Production with Nginx)
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    container_name: eztrip-frontend-prod
+    ports:
+      - "80:80"
+      - "443:443" # If using HTTPS
+    environment:
+      # React build-time environment variables are baked into the build
+      # These are only for reference - actual values must be set before building
+      - REACT_APP_BACKEND_URL=${REACT_APP_BACKEND_URL}
+      - REACT_APP_GOOGLE_CLIENT_ID=${REACT_APP_GOOGLE_CLIENT_ID}
+    depends_on:
+      - backend
+    networks:
+      - eztrip-prod-network
+    restart: always
+    healthcheck:
+      test: [ "CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health" ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+volumes:
+  mongodb_prod_data:
+    driver: local
+  backend_uploads:
+    driver: local
+
+networks:
+  eztrip-prod-network:
+    driver: bridge
+
+# Production Notes:
+# 1. Before deploying, ensure all environment variables are set in your .env file
+# 2. For production, consider using MongoDB authentication
+# 3. For HTTPS, configure SSL certificates and update nginx configuration
+# 4. Consider using a reverse proxy (nginx/traefik) in front of services
+# 5. Implement proper backup strategies for MongoDB data
+# 6. Monitor resource usage and adjust limits as needed
+# 7. Use secrets management for sensitive credentials (e.g., Docker secrets, vault)

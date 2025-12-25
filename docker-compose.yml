@@ -1,3 +1,7 @@
+# Development Docker Compose Configuration
+# This file is for LOCAL DEVELOPMENT ONLY
+# For production deployment, use docker-compose.prod.yml instead
+
 services:
   # MongoDB Service
   mongodb:
@@ -16,13 +20,17 @@ services:
       retries: 5
       start_period: 40s
 
-  # Backend API Service
+  # Backend API Service (Development with hot reload)
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      target: development
     container_name: eztrip-backend
     ports:
       - "8000:8000"
     environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=eztrip
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
@@ -55,14 +63,16 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # Frontend React Service
+  # Frontend React Service (Development with hot reload)
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: development
     container_name: eztrip-frontend
     ports:
       - "3000:3000"
     environment:
-      # CHANGED: Renamed from REACT_APP_API_URL to REACT_APP_BACKEND_URL to match App.js
+      # REACT_APP_BACKEND_URL is used in App.js
       - REACT_APP_BACKEND_URL=http://localhost:8000
       - REACT_APP_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - WATCHPACK_POLLING=true

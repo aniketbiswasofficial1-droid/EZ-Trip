@@ -263,8 +263,8 @@ const TripPlanner = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <div className="grid lg:grid-cols-2 gap-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
           {/* Left: Form */}
           <div className="space-y-6">
             <div className="animate-fade-in">
@@ -276,9 +276,9 @@ const TripPlanner = () => {
               </p>
             </div>
 
-            <div className="bg-card border border-border rounded-xl p-6 space-y-6 animate-slide-up">
+            <div className="bg-card border border-border rounded-xl p-4 sm:p-6 space-y-6 animate-slide-up">
               {/* Destination and Departure City - Swapped Order */}
-              <div className="grid lg:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="departure-city">Departure City</Label>
                   <div className="relative">
@@ -421,7 +421,7 @@ const TripPlanner = () => {
               </div>
 
               {/* Preferences Grid - Row 1: Travelers & Currency */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Travelers */}
                 <div className="space-y-2">
                   <Label>Number of Travelers</Label>
@@ -486,7 +486,7 @@ const TripPlanner = () => {
               </div>
 
               {/* Preferences Grid - Row 2: Budget & Accommodation */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 {/* Budget */}
                 <div className="space-y-2">
                   <Label>Budget Preference</Label>
@@ -669,7 +669,7 @@ const TripPlanner = () => {
 
                 {/* Transport Details */}
                 {(plan.departure_transport_details || plan.return_transport_details) && (
-                  <div className="grid md:grid-cols-2 gap-4 mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
                     {plan.departure_transport_details && (
                       <div className="bg-card border border-border rounded-xl p-6">
                         <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">

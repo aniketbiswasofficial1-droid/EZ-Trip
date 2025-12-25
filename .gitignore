@@ -31,11 +31,34 @@ dist/
 dist
 
 # Environment files (comprehensive coverage)
+# Prevent ALL environment files with credentials from being committed
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+backend/.env
+backend/.env.local
+backend/.env.*.local
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
 
+# OAuth and credential files
 *token.json*
 *credentials.json*
-.env
-backend/.env
+*service-account*.json
+*.pem
+*.key
+*.cert
+*.p12
+*.pfx
+
+# Secrets and keys
+secrets/
+.secrets
+*.secret
 
 # Logs and debug files
 npm-debug.log*

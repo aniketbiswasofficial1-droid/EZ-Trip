@@ -235,7 +235,7 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Welcome Section */}
         <div className="mb-12 animate-fade-in">
           <h1 className="font-heading text-4xl sm:text-5xl font-bold mb-2">
@@ -247,7 +247,7 @@ const Dashboard = () => {
         </div>
 
         {/* Balance Overview */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12 stagger-children">
+        <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12 stagger-children">
           <div className="bg-card border border-border rounded-xl p-6 animate-fade-in opacity-0">
             <p className="text-sm text-muted-foreground mb-1">Overall Balance</p>
             <p
@@ -428,7 +428,7 @@ const Dashboard = () => {
               </Button>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 stagger-children">
               {trips.map((trip, index) => (
                 <div
                   key={trip.trip_id}
@@ -541,7 +541,7 @@ const Dashboard = () => {
           </div>
 
           {savedPlans.length > 0 ? (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {savedPlans.map((plan) => (
                 <div
                   key={plan.plan_id}
