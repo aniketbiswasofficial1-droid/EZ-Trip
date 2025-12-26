@@ -87,10 +87,10 @@ const AuthProvider = ({ children }) => {
   };
 
   // NEW: Registration
-  const register = async (name, email, password) => {
+  const register = async (name, email, username, password) => {
     try {
       const response = await axios.post(`${API}/auth/register`,
-        { name, email, password },
+        { name, email, username, password },  // NEW: Include username
         { withCredentials: true }
       );
       setUser(response.data);

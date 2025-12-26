@@ -44,6 +44,7 @@ import {
   Link2,
 } from "lucide-react";
 import { PlanViewer } from "@/components/PlanViewer";
+import UsernameSetupModal from "@/components/UsernameSetupModal";
 
 const TRIP_COVERS = [
   "https://images.unsplash.com/photo-1628584547352-70ec34799bc1?crop=entropy&cs=srgb&fm=jpg&q=85&w=400",
@@ -69,12 +70,22 @@ const Dashboard = () => {
     cover_image: TRIP_COVERS[0],
   });
 
+  // NEW: Username setup modal state
+  const [showUsernameSetup, setShowUsernameSetup] = useState(false);
+
   useEffect(() => {
     fetchTrips();
     fetchCurrencies();
     checkAdminStatus();
     fetchSavedPlans();
-  }, []);
+
+    // NEW: Check if user needs to set username
+    const skipped = sessionStorage.getItem("username_setup_skipped");
+    if (user && !user.username && !skipped) {
+      // Delay showing modal to avoid jarring experience
+      setTimeout(() => setShowUsernameSetup(true), 1000);
+    }
+  }, [user]);
 
   const checkAdminStatus = async () => {
     try {
@@ -651,6 +662,12 @@ const Dashboard = () => {
           </DialogContent>
         </Dialog>
       </main>
+
+      {/* NEW: Username Setup Modal */}
+      <UsernameSetupModal
+        isOpen={showUsernameSetup}
+        onClose={() => setShowUsernameSetup(false)}
+      />
     </div>
   );
 };

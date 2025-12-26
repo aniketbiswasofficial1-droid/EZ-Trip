@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth, API } from "@/App";
 import axios from "axios";
@@ -98,6 +98,13 @@ const TripDetail = () => {
 
   // New member form
   const [newMember, setNewMember] = useState({ email: "", name: "" });
+  const [addingMember, setAddingMember] = useState(false);
+
+  // NEW: Username search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isSearching, setIsSearching] = useState(false);
 
   // New refund form
   const [newRefund, setNewRefund] = useState({
@@ -430,26 +437,95 @@ const TripDetail = () => {
   const handleAddMember = async (e) => {
     e.preventDefault();
 
-    if (!newMember.email || !newMember.name) {
-      toast.error("Please fill in all fields");
-      return;
+    // NEW: Support both selected user and manual email entry
+    const memberData = selectedUser
+      ? { username: selectedUser.username, name: selectedUser.name }
+      : { email: newMember.email, name: newMember.name };
+
+    if (selectedUser) {
+      // Adding by username
+      if (!selectedUser.username) {
+        toast.error("Selected user has no username");
+        return;
+      }
+    } else {
+      // Adding by email
+      if (!newMember.email || !newMember.name) {
+        toast.error("Please fill in all fields");
+        return;
+      }
     }
+
+    setAddingMember(true);
 
     try {
       await axios.post(
         `${API}/trips/${tripId}/members`,
-        newMember,
+        memberData,
         { withCredentials: true }
       );
 
-      toast.success("Member added successfully!");
-      setAddMemberOpen(false);
+      // Clear form and selection
       setNewMember({ email: "", name: "" });
-      fetchTrip();
+      setSelectedUser(null);
+      setSearchQuery("");
+      setSearchResults([]);
+
+      // Try to refresh trip data to get updated members list
+      try {
+        await fetchTrip();
+      } catch (fetchError) {
+        console.error("Error refreshing trip data after adding member:", fetchError);
+      }
+
+      // Show success notification
+      toast.success("Member added successfully!");
+
+      // Close modal after everything is done
+      setAddMemberOpen(false);
     } catch (error) {
       console.error("Error adding member:", error);
       toast.error(error.response?.data?.detail || "Failed to add member");
+    } finally {
+      setAddingMember(false);
     }
+  };
+
+  // NEW: Debounced search for users
+  const debounce = (func, wait) => {
+    let timeout;
+    return (...args) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(...args), wait);
+    };
+  };
+
+  const handleSearch = useMemo(
+    () => debounce(async (query) => {
+      if (query.length < 2) {
+        setSearchResults([]);
+        return;
+      }
+
+      setIsSearching(true);
+      try {
+        const response = await axios.get(`${API}/auth/search-user?q=${query}`,
+          { withCredentials: true });
+        setSearchResults(response.data.results || []);
+      } catch (error) {
+        console.error('Search error:', error);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300),
+    []
+  );
+
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    setSearchQuery("");
+    setSearchResults([]);
   };
 
   // Handle refund creation
@@ -661,39 +737,120 @@ const TripDetail = () => {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleAddMember} className="space-y-4 pt-4">
+                  {/* Search for registered users */}
                   <div className="space-y-2">
-                    <Label htmlFor="member-name">Name</Label>
+                    <Label>Search by username or email</Label>
                     <Input
-                      id="member-name"
-                      placeholder="John Doe"
-                      value={newMember.name}
-                      onChange={(e) =>
-                        setNewMember({ ...newMember, name: e.target.value })
-                      }
-                      data-testid="member-name-input"
+                      placeholder="Type username or email..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        handleSearch(e.target.value);
+                      }}
+                      disabled={!!selectedUser}
                     />
+
+                    {/* Search results dropdown */}
+                    {searchResults.length > 0 && !selectedUser && (
+                      <div className="border rounded-md max-h-48 overflow-y-auto bg-card">
+                        {searchResults.map(user => (
+                          <div
+                            key={user.user_id}
+                            className="p-3 hover:bg-secondary cursor-pointer flex items-center gap-3"
+                            onClick={() => handleSelectUser(user)}
+                          >
+                            <img
+                              src={user.picture}
+                              alt={user.name}
+                              className="w-10 h-10 rounded-full"
+                            />
+                            <div>
+                              <div className="font-semibold">{user.name}</div>
+                              <div className="text-sm text-muted-foreground">@{user.username}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="member-email">Email</Label>
-                    <Input
-                      id="member-email"
-                      type="email"
-                      placeholder="john@example.com"
-                      value={newMember.email}
-                      onChange={(e) =>
-                        setNewMember({ ...newMember, email: e.target.value })
-                      }
-                      data-testid="member-email-input"
-                    />
+
+                  {/* Selected user display */}
+                  {selectedUser && (
+                    <div className="p-3 bg-primary/10 rounded-md flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={selectedUser.picture}
+                          alt={selectedUser.name}
+                          className="w-10 h-10 rounded-full"
+                        />
+                        <div>
+                          <div className="font-semibold">{selectedUser.name}</div>
+                          <div className="text-sm text-muted-foreground">@{selectedUser.username}</div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setSelectedUser(null)}
+                        size="sm"
+                      >
+                        Change
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Manual email entry (for non-registered users) */}
+                  <div className="pt-4 border-t space-y-4">
+                    <Label className="text-muted-foreground">Or add by email (for non-registered users)</Label>
+                    <div className="space-y-2">
+                      <Input
+                        id="member-email"
+                        type="email"
+                        placeholder="email@example.com"
+                        value={newMember.email}
+                        onChange={(e) =>
+                          setNewMember({ ...newMember, email: e.target.value })
+                        }
+                        disabled={!!selectedUser}
+                        data-testid="member-email-input"
+                      />
+                    </div>
+
+                    {newMember.email && !selectedUser && (
+                      <div className="space-y-2">
+                        <Input
+                          id="member-name"
+                          placeholder="Display name"
+                          value={newMember.name}
+                          onChange={(e) =>
+                            setNewMember({ ...newMember, name: e.target.value })
+                          }
+                          data-testid="member-name-input"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          ℹ️ Guest users will show this name until they register
+                        </p>
+                      </div>
+                    )}
                   </div>
+
                   <Button
                     type="submit"
                     className="w-full rounded-full font-bold btn-glow"
                     data-testid="submit-add-member-btn"
+                    disabled={addingMember || (!selectedUser && (!newMember.email || !newMember.name))}
                   >
-                    Add Member
+                    {addingMember ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        Adding Member...
+                      </>
+                    ) : (
+                      selectedUser ? (selectedUser.username ? `Add @${selectedUser.username}` : `Add ${selectedUser.name}`) : "Add Member"
+                    )}
                   </Button>
                 </form>
+
               </DialogContent>
             </Dialog>
 

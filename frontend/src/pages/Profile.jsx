@@ -43,6 +43,12 @@ const Profile = () => {
     const [dateOfBirth, setDateOfBirth] = useState(user?.date_of_birth || "");
     const [profilePicture, setProfilePicture] = useState(user?.picture || "");
 
+    // NEW: Username editing state
+    const [editingUsername, setEditingUsername] = useState(false);
+    const [newUsername, setNewUsername] = useState(user?.username || "");
+    const [usernameError, setUsernameError] = useState("");
+    const [updatingUsername, setUpdatingUsername] = useState(false);
+
     // Password form state
     const [currentPassword, setCurrentPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
@@ -54,6 +60,7 @@ const Profile = () => {
             setName(user.name || "");
             setDateOfBirth(user.date_of_birth || "");
             setProfilePicture(user.picture || "");
+            setNewUsername(user.username || "");  // NEW: Set username
         }
         checkAdminStatus();
     }, [user]);
@@ -368,6 +375,90 @@ const Profile = () => {
                                     />
                                     <p className="text-xs text-muted-foreground">
                                         Email cannot be changed
+                                    </p>
+                                </div>
+
+                                {/* NEW: Username */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="username">Username</Label>
+                                    {editingUsername ? (
+                                        <div className="space-y-2">
+                                            <Input
+                                                id="username"
+                                                value={newUsername}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.toLowerCase();
+                                                    setNewUsername(val);
+                                                    if (val && !/^[a-z0-9_-]{3,20}$/.test(val)) {
+                                                        setUsernameError("Username must be 3-20 characters (letters, numbers, _, -)");
+                                                    } else {
+                                                        setUsernameError("");
+                                                    }
+                                                }}
+                                                placeholder="Enter new username"
+                                                className="h-12"
+                                            />
+                                            {usernameError && (
+                                                <p className="text-sm text-destructive">{usernameError}</p>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    type="button"
+                                                    onClick={async () => {
+                                                        if (usernameError || !newUsername) return;
+                                                        setUpdatingUsername(true);
+                                                        try {
+                                                            await axios.put(
+                                                                `${API}/auth/me/username`,
+                                                                { username: newUsername },
+                                                                { withCredentials: true }
+                                                            );
+                                                            await refreshUser();
+                                                            toast.success("Username updated!");
+                                                            setEditingUsername(false);
+                                                        } catch (error) {
+                                                            toast.error(error.response?.data?.detail || "Failed to update username");
+                                                        } finally {
+                                                            setUpdatingUsername(false);
+                                                        }
+                                                    }}
+                                                    size="sm"
+                                                    disabled={updatingUsername || !!usernameError}
+                                                >
+                                                    {updatingUsername ? "Saving..." : "Save"}
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setEditingUsername(false);
+                                                        setNewUsername(user?.username || "");
+                                                        setUsernameError("");
+                                                    }}
+                                                    variant="outline"
+                                                    size="sm"
+                                                >
+                                                    Cancel
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center justify-between h-12 px-3 rounded-md border border-border bg-secondary/50">
+                                            <span className="text-gray-600">@{user?.username || "Not set"}</span>
+                                            <Button
+                                                type="button"
+                                                onClick={() => {
+                                                    setNewUsername(user?.username || "");
+                                                    setEditingUsername(true);
+                                                }}
+                                                variant="ghost"
+                                                size="sm"
+                                            >
+                                                Edit
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">
+                                        Your unique @username for easy discovery
                                     </p>
                                 </div>
 

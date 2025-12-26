@@ -122,6 +122,7 @@ class UserBase(BaseModel):
     user_id: str
     email: str
     name: str
+    username: Optional[str] = None  # NEW: Unique username
     picture: Optional[str] = None
     custom_profile_picture: Optional[str] = None
     date_of_birth: Optional[str] = None
@@ -138,6 +139,9 @@ class PasswordChange(BaseModel):
     current_password: str
     new_password: str
 
+class UsernameUpdate(BaseModel):
+    username: str
+
 class TripCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -148,6 +152,7 @@ class TripMember(BaseModel):
     user_id: str
     name: str
     email: str
+    username: Optional[str] = None  # NEW: Username for registered users
     picture: Optional[str] = None
 
 class TripResponse(BaseModel):
@@ -228,7 +233,8 @@ class SettlementSuggestion(BaseModel):
     currency: str
 
 class TripAddMember(BaseModel):
-    email: str
+    email: Optional[str] = None
+    username: Optional[str] = None  # NEW: Can add by username
     name: str
 
 class SettlementCreate(BaseModel):
@@ -359,10 +365,56 @@ def validate_strong_password(password: str):
     if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
         raise HTTPException(status_code=400, detail="Password must contain at least one special character")
 
+# Username Validation
+def validate_username(username: str):
+    """Validate username format"""
+    if not re.match(r'^[a-zA-Z0-9_-]{3,20}$', username):
+        raise HTTPException(
+            status_code=400, 
+            detail="Username must be 3-20 characters (letters, numbers, _, -)"
+        )
+    return username.lower()
+
+async def is_username_taken(username: str, exclude_user_id: Optional[str] = None) -> bool:
+    """Check if username is already taken"""
+    query = {"username": username.lower()}
+    if exclude_user_id:
+        query["user_id"] = {"$ne": exclude_user_id}
+    user = await db.users.find_one(query)
+    return user is not None
+
+async def generate_unique_username(email: str, name: str) -> str:
+    """Generate a unique username from email or name"""
+    # Try username from email first (john.doe@gmail.com -> john_doe)
+    base_username = email.split('@')[0].lower()
+    base_username = re.sub(r'[^a-z0-9_-]', '_', base_username)
+    
+    # If too short, add part of name
+    if len(base_username) < 3:
+        name_part = re.sub(r'[^a-z0-9_-]', '_', name.lower())[:10]
+        base_username = f"{name_part}_{base_username}"
+    
+    # Truncate if too long
+    base_username = base_username[:15]
+    
+    # Check if taken, add random suffix if needed
+    username = base_username
+    counter = 1
+    while await is_username_taken(username):
+        random_suffix = uuid.uuid4().hex[:4]
+        username = f"{base_username}_{random_suffix}"
+        counter += 1
+        if counter > 10:  # Fallback to pure random
+            username = f"user_{uuid.uuid4().hex[:12]}"
+            break
+    
+    return username
+
 class UserRegister(BaseModel):
     email: str
     password: str
     name: str
+    username: str  # NEW: Required username
 
 class UserLogin(BaseModel):
     email: str
@@ -374,12 +426,19 @@ async def register(user_data: UserRegister, response: Response):
     
     # Validate password strength
     validate_strong_password(user_data.password)
+    
+    # Validate username
+    validate_username(user_data.username)
 
     # Check if user exists
     try:
         existing_user = await db.users.find_one({"email": user_data.email})
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
+        
+        # Check if username is taken
+        if await is_username_taken(user_data.username):
+            raise HTTPException(status_code=400, detail="Username already taken")
         
         # Create new user
         user_id = f"user_{uuid.uuid4().hex[:12]}"
@@ -390,6 +449,7 @@ async def register(user_data: UserRegister, response: Response):
             "email": user_data.email,
             "password_hash": hashed_password, 
             "name": user_data.name,
+            "username": user_data.username.lower(),  # NEW: Save username
             "picture": f"https://api.dicebear.com/7.x/initials/svg?seed={user_data.name}", 
             "default_currency": "INR",
             "created_at": datetime.now(timezone.utc).isoformat()
@@ -624,26 +684,37 @@ async def google_auth(auth_data: GoogleAuthRequest, response: Response):
             # User exists - update their profile info from Google
             user_id = user["user_id"]
             
-            # Update user's picture and name from Google
+            # NEW: Ensure existing user has a username
+            update_data = {
+                "picture": picture,
+                "name": name,
+                "oauth_provider": "google",
+                "oauth_id": google_id
+            }
+            
+            # If user doesn't have username, generate one
+            if not user.get("username"):
+                new_username = await generate_unique_username(email, name)
+                update_data["username"] = new_username
+                logger.info(f"Auto-generated username {new_username} for existing user {user_id}")
+            
             await db.users.update_one(
                 {"user_id": user_id},
-                {"$set": {
-                    "picture": picture,
-                    "name": name,
-                    "oauth_provider": "google",
-                    "oauth_id": google_id
-                }}
+                {"$set": update_data}
             )
             
             # Update user's profile in all trips they're a member of
             await update_user_in_all_trips(user_id, name, picture)
         else:
-            # Create new user
+            # Create new user with auto-generated username
             user_id = f"user_{uuid.uuid4().hex[:12]}"
+            username = await generate_unique_username(email, name)
+            
             new_user = {
                 "user_id": user_id,
                 "email": email,
                 "name": name,
+                "username": username,  # NEW: Auto-generated username
                 "picture": picture,
                 "oauth_provider": "google",
                 "oauth_id": google_id,
@@ -651,6 +722,8 @@ async def google_auth(auth_data: GoogleAuthRequest, response: Response):
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
             await db.users.insert_one(new_user)
+            
+            logger.info(f"Created new Google user with auto-generated username: {username}")
             
             # Link to existing trips
             await link_user_to_existing_trips(user_id, email)
@@ -803,6 +876,71 @@ async def change_password(
     )
     
     return {"message": "Password updated successfully"}
+
+# NEW: Username Search Endpoint
+@auth_router.get("/search-user")
+async def search_user(q: str):
+    """Search for users by username or email"""
+    query = q.strip().lower()
+    
+    # Search by username or email
+    users = await db.users.find(
+        {
+            "$or": [
+                {"username": {"$regex": f"^{query}", "$options": "i"}},
+                {"email": {"$regex": f"^{query}", "$options": "i"}}
+            ]
+        },
+        {"_id": 0, "user_id": 1, "username": 1, "name": 1, "email": 1, "picture": 1, "custom_profile_picture": 1}
+    ).limit(10).to_list(10)
+    
+    # Use custom profile picture if available
+    for user in users:
+        if user.get("custom_profile_picture"):
+            user["picture"] = user["custom_profile_picture"]
+        user.pop("custom_profile_picture", None)
+    
+    return {"results": users}
+
+# NEW: Username Update Endpoint
+@auth_router.put("/me/username")
+async def update_username(
+    username_data: UsernameUpdate,
+    user: dict = Depends(get_current_user)
+):
+    """Update user's username"""
+    # Validate format
+    validate_username(username_data.username)
+    
+    # Check if already taken (excluding current user)
+    if await is_username_taken(username_data.username, exclude_user_id=user["user_id"]):
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    # Update username
+    await db.users.update_one(
+        {"user_id": user["user_id"]},
+        {"$set": {"username": username_data.username.lower()}}
+    )
+    
+    # Update username in all trips
+    await update_username_in_all_trips(user["user_id"], username_data.username.lower())
+    
+    return {"message": "Username updated successfully", "username": username_data.username.lower()}
+
+async def update_username_in_all_trips(user_id: str, username: str):
+    """Update user's username in all trip members"""
+    trips_cursor = db.trips.find({"members.user_id": user_id})
+    trips = await trips_cursor.to_list(None)
+    
+    for trip in trips:
+        for i, member in enumerate(trip["members"]):
+            if member["user_id"] == user_id:
+                await db.trips.update_one(
+                    {"trip_id": trip["trip_id"]},
+                    {"$set": {f"members.{i}.username": username}}
+                )
+                logger.info(f"Updated username for user {user_id} in trip {trip['trip_id']}")
+                break
 
 # Serve uploaded profile pictures
 @auth_router.get("/uploads/profile-pictures/{filename}")
@@ -1020,6 +1158,10 @@ async def add_member(
     user: dict = Depends(get_current_user)
 ):
     """Add a member to trip"""
+    # NEW: Support adding by username or email
+    if not member.email and not member.username:
+        raise HTTPException(status_code=400, detail="Provide email or username")
+    
     trip = await db.trips.find_one(
         {"trip_id": trip_id, "members.user_id": user["user_id"]},
         {"_id": 0}
@@ -1028,33 +1170,44 @@ async def add_member(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip not found")
     
-    # Check if member already exists
+    # NEW: Build query to find user by username or email
+    query = {}
+    if member.username:
+        query["username"] = member.username.lower()
+    elif member.email:
+        query["email"] = member.email
+    
+    # Check if member already exists in trip
+    check_email = member.email if member.email else None
+    check_username = member.username.lower() if member.username else None
     existing_member = next(
-        (m for m in trip["members"] if m["email"] == member.email),
+        (m for m in trip["members"] if 
+         (check_email and m.get("email") == check_email) or
+         (check_username and m.get("username") == check_username)),
         None
     )
     if existing_member:
         raise HTTPException(status_code=400, detail="Member already in trip")
     
     # Check if user exists in system
-    existing_user = await db.users.find_one(
-        {"email": member.email},
-        {"_id": 0}
-    )
+    existing_user = await db.users.find_one(query, {"_id": 0})
     
     if existing_user:
+        # Use registered user's data
         new_member = {
             "user_id": existing_user["user_id"],
             "name": existing_user["name"],
             "email": existing_user["email"],
-            "picture": existing_user.get("picture")
+            "username": existing_user.get("username"),  # NEW: Include username
+            "picture": existing_user.get("custom_profile_picture") or existing_user.get("picture")
         }
     else:
-        # Create placeholder user_id for non-registered users
+        # Create placeholder for non-registered users (guests)
         new_member = {
             "user_id": f"guest_{uuid.uuid4().hex[:8]}",
             "name": member.name,
-            "email": member.email,
+            "email": member.email or f"guest_{uuid.uuid4().hex[:8]}@guest.local",
+            "username": None,  # NEW: Guests don't have usernames
             "picture": None
         }
     
@@ -1063,22 +1216,29 @@ async def add_member(
         {"$push": {"members": new_member}}
     )
     
-    # Send email notification to the new member
-    try:
-        trip_creator = next((m for m in trip["members"] if m["user_id"] == user["user_id"]), None)
-        if trip_creator:
-            await EmailService.send_member_added_notification(
-                trip_name=trip["name"],
-                new_member_name=new_member["name"],
-                new_member_email=new_member["email"],
-                added_by_name=trip_creator["name"]
-            )
-            logger.info(f"Sent member added notification to {new_member['email']}")
-    except Exception as e:
-        logger.error(f"Failed to send member added notification: {str(e)}")
-        # Don't fail the request if email fails
+    # Return response immediately - don't wait for email
+    response_data = {"message": "Member added", "member": new_member}
     
-    return {"message": "Member added", "member": new_member}
+    # Send email notification in background (non-blocking)
+    async def send_email_background():
+        try:
+            trip_creator = next((m for m in trip["members"] if m["user_id"] == user["user_id"]), None)
+            if trip_creator:
+                await EmailService.send_member_added_notification(
+                    trip_name=trip["name"],
+                    new_member_name=new_member["name"],
+                    new_member_email=new_member["email"],
+                    added_by_name=trip_creator["name"]
+                )
+                logger.info(f"Sent member added notification to {new_member['email']}")
+        except Exception as e:
+            logger.error(f"Failed to send member added notification: {str(e)}")
+    
+    # Schedule email to be sent in background (fire and forget)
+    import asyncio
+    asyncio.create_task(send_email_background())
+    
+    return response_data
 
 @trips_router.delete("/{trip_id}/members/{member_user_id}")
 async def remove_member(

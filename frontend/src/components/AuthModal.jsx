@@ -22,11 +22,13 @@ const AuthModal = ({ isOpen, onClose, defaultTab = "login" }) => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    username: "",  // NEW: Username field
     password: "",
     confirmPassword: ""
   });
 
   const [passwordError, setPasswordError] = useState("");
+  const [usernameError, setUsernameError] = useState("");  // NEW: Username validation
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -73,7 +75,7 @@ const AuthModal = ({ isOpen, onClose, defaultTab = "login" }) => {
           return;
         }
 
-        await register(formData.name, formData.email, formData.password);
+        await register(formData.name, formData.email, formData.username, formData.password);
         onClose();
       }
     } catch (error) {
@@ -117,8 +119,9 @@ const AuthModal = ({ isOpen, onClose, defaultTab = "login" }) => {
 
         <Tabs value={activeTab} onValueChange={(val) => {
           setActiveTab(val);
-          setFormData({ name: "", email: "", password: "", confirmPassword: "" });
+          setFormData({ name: "", email: "", username: "", password: "", confirmPassword: "" });
           setPasswordError("");
+          setUsernameError("");
         }} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="login">Log In</TabsTrigger>
@@ -137,6 +140,35 @@ const AuthModal = ({ isOpen, onClose, defaultTab = "login" }) => {
                   onChange={handleChange}
                   required
                 />
+              </div>
+            )}
+
+            {activeTab === "register" && (
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Input
+                  id="username"
+                  name="username"
+                  placeholder="john_doe"
+                  value={formData.username}
+                  onChange={(e) => {
+                    const val = e.target.value.toLowerCase();
+                    setFormData({ ...formData, username: val });
+                    // Validate username format
+                    if (val && !/^[a-z0-9_-]{3,20}$/.test(val)) {
+                      setUsernameError("Username must be 3-20 characters (letters, numbers, _, -)");
+                    } else {
+                      setUsernameError("");
+                    }
+                  }}
+                  required
+                />
+                {usernameError && (
+                  <p className="text-xs text-destructive">{usernameError}</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Your unique @username for easy discovery
+                </p>
               </div>
             )}
 
