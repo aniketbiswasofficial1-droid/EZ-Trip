@@ -2606,6 +2606,187 @@ async def unlink_trip_plan(trip_id: str, user: dict = Depends(get_current_user))
         raise HTTPException(status_code=500, detail="Failed to unlink plan")
 
 # ========================
+# LOCATION SEARCH & FAVORITES ROUTES
+# ========================
+
+locations_router = APIRouter(prefix="/locations", tags=["locations"])
+
+class FavoriteLocation(BaseModel):
+    id: str
+    name: str
+    display_name: str
+    country: str
+    state: Optional[str] = None
+    lat: float
+    lon: float
+
+@locations_router.get("/search")
+async def search_locations(q: str):
+    """Search for locations using Photon geocoding API"""
+    try:
+        if not q or len(q.strip()) < 2:
+            return {"locations": []}
+        
+        logger.info(f"Searching for location: {q}")
+        
+        # Use Photon API - free, open-source geocoding based on OpenStreetMap
+        try:
+            # Add User-Agent header to prevent 403 Forbidden errors
+            headers = {
+                "User-Agent": "EZ-Trip/1.0 (Travel Planning Application; contact@example.com)"
+            }
+            
+            async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
+                logger.info(f"Calling Photon API: https://photon.komoot.io/api/?q={q}")
+                response = await client.get(
+                    "https://photon.komoot.io/api/",
+                    params={"q": q, "limit": 10}
+                )
+                logger.info(f"Photon API response status: {response.status_code}")
+                response.raise_for_status()
+                data = response.json()
+                logger.info(f"Photon API returned {len(data.get('features', []))} results")
+        except httpx.TimeoutException as e:
+            logger.error(f"Photon API timeout for query '{q}': {e}")
+            raise HTTPException(status_code=504, detail="Location search timed out. Please try again.")
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Photon API HTTP error for query '{q}': Status {e.response.status_code}, {e}")
+            raise HTTPException(status_code=502, detail=f"Location search service returned error: {e.response.status_code}")
+        except httpx.ConnectError as e:
+            logger.error(f"Photon API connection error for query '{q}': {e}")
+            raise HTTPException(status_code=502, detail="Cannot connect to location search service. Check internet connection.")
+        except httpx.RequestError as e:
+            logger.error(f"Photon API request error for query '{q}': {e}")
+            raise HTTPException(status_code=502, detail=f"Location search request failed: {str(e)}")
+        
+        # Format the results
+        locations = []
+        for feature in data.get("features", []):
+            props = feature.get("properties", {})
+            coords = feature.get("geometry", {}).get("coordinates", [])
+            
+            if len(coords) >= 2:
+                # Build display name
+                name_parts = []
+                city = props.get("city") or props.get("name")
+                state = props.get("state")
+                country = props.get("country")
+                
+                if city:
+                    name_parts.append(city)
+                if state and state != city:
+                    name_parts.append(state)
+                if country:
+                    name_parts.append(country)
+                
+                display_name = ", ".join(name_parts)
+                
+                # Generate a unique ID based on coordinates
+                location_id = f"loc_{abs(hash(f'{coords[1]},{coords[0]}'))}".replace("-", "")[:16]
+                
+                locations.append({
+                    "id": location_id,
+                    "name": city or props.get("name", "Unknown"),
+                    "display_name": display_name,
+                    "country": country or "",
+                    "state": state or "",
+                    "lat": coords[1],  # Photon returns [lon, lat]
+                    "lon": coords[0]
+                })
+        
+        logger.info(f"Returning {len(locations)} formatted locations")
+        return {"locations": locations}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in location search for query '{q}': {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to search locations: {str(e)}")
+
+# Favorite Locations Endpoints
+favorite_locations_router = APIRouter(prefix="/user/favorite-locations", tags=["favorite-locations"])
+
+@favorite_locations_router.get("")
+async def get_favorite_locations(user: dict = Depends(get_current_user)):
+    """Get user's favorite locations"""
+    try:
+        user_data = await db.users.find_one(
+            {"user_id": user["user_id"]},
+            {"_id": 0, "favorite_locations": 1}
+        )
+        
+        return {"favorites": user_data.get("favorite_locations", [])}
+    except Exception as e:
+        logger.error(f"Error fetching favorite locations: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch favorite locations")
+
+@favorite_locations_router.post("")
+async def add_favorite_location(
+    location: FavoriteLocation,
+    user: dict = Depends(get_current_user)
+):
+    """Add a location to user's favorites"""
+    try:
+        # Check if location already exists in favorites
+        existing = await db.users.find_one({
+            "user_id": user["user_id"],
+            "favorite_locations.id": location.id
+        })
+        
+        if existing:
+            return {"message": "Location already in favorites"}
+        
+        # Add timestamp
+        location_data = location.model_dump()
+        location_data["added_at"] = datetime.now(timezone.utc).isoformat()
+        
+        # Initialize favorite_locations array if it doesn't exist
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$setOnInsert": {"favorite_locations": []}},
+            upsert=False
+        )
+        
+        # Add to favorites
+        await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$push": {"favorite_locations": location_data}}
+        )
+        
+        logger.info(f"Added favorite location {location.name} for user {user['user_id']}")
+        return {"message": "Location added to favorites", "location": location_data}
+    
+    except Exception as e:
+        logger.error(f"Error adding favorite location: {e}")
+        raise HTTPException(status_code=500, detail="Failed to add favorite location")
+
+@favorite_locations_router.delete("/{location_id}")
+async def remove_favorite_location(
+    location_id: str,
+    user: dict = Depends(get_current_user)
+):
+    """Remove a location from user's favorites"""
+    try:
+        result = await db.users.update_one(
+            {"user_id": user["user_id"]},
+            {"$pull": {"favorite_locations": {"id": location_id}}}
+        )
+        
+        if result.modified_count == 0:
+            raise HTTPException(status_code=404, detail="Favorite location not found")
+        
+        logger.info(f"Removed favorite location {location_id} for user {user['user_id']}")
+        return {"message": "Location removed from favorites"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error removing favorite location: {e}")
+        raise HTTPException(status_code=500, detail="Failed to remove favorite location")
+
+
+
+# ========================
 # INCLUDE ROUTERS
 # ========================
 
@@ -2617,6 +2798,8 @@ api_router.include_router(settlements_router)
 api_router.include_router(planner_router)
 api_router.include_router(admin_router)
 api_router.include_router(user_plans_router)
+api_router.include_router(locations_router)
+api_router.include_router(favorite_locations_router)
 
 @api_router.get("/")
 async def root():

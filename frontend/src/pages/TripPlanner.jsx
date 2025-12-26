@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { LocationAutocomplete } from "@/components/LocationAutocomplete";
 import {
   Select,
   SelectContent,
@@ -80,7 +81,8 @@ const TripPlanner = () => {
   const [errors, setErrors] = useState({});
 
   // Form state
-  const [destination, setDestination] = useState("");
+  const [destination, setDestination] = useState(null);
+  const [departureLocation, setDepartureLocation] = useState(null);
   const [startDate, setStartDate] = useState(addDays(new Date(), 7));
   const [endDate, setEndDate] = useState(addDays(new Date(), 14));
   const [numTravelers, setNumTravelers] = useState(2);
@@ -90,7 +92,6 @@ const TripPlanner = () => {
   const [accommodationType, setAccommodationType] = useState("hotel");
   const [departureTransport, setDepartureTransport] = useState("flight");
   const [returnTransport, setReturnTransport] = useState("flight");
-  const [departureCity, setDepartureCity] = useState("");
 
   const handleInterestToggle = (interestId) => {
     setInterests((prev) =>
@@ -103,8 +104,8 @@ const TripPlanner = () => {
   const handleGeneratePlan = async () => {
     const newErrors = {};
 
-    if (!destination.trim()) {
-      newErrors.destination = "Please enter a destination";
+    if (!destination) {
+      newErrors.destination = "Please select a destination";
     }
 
     if (!startDate || !endDate) {
@@ -115,8 +116,8 @@ const TripPlanner = () => {
       newErrors.dates = "End date must be after start date";
     }
 
-    if ((departureTransport !== "none" || returnTransport !== "none") && !departureCity.trim()) {
-      newErrors.departureCity = "Please enter your departure city";
+    if ((departureTransport !== "none" || returnTransport !== "none") && !departureLocation) {
+      newErrors.departureLocation = "Please select your departure location";
     }
 
     if (!numTravelers || numTravelers < 1) {
@@ -137,7 +138,7 @@ const TripPlanner = () => {
       const response = await axios.post(
         `${API}/planner/generate`,
         {
-          destination,
+          destination: destination.name,
           start_date: format(startDate, "yyyy-MM-dd"),
           end_date: format(endDate, "yyyy-MM-dd"),
           num_travelers: Number(numTravelers) || 1,
@@ -147,7 +148,7 @@ const TripPlanner = () => {
           accommodation_type: accommodationType,
           departure_transport: departureTransport,
           return_transport: returnTransport,
-          departure_city: (departureTransport !== "none" || returnTransport !== "none") ? departureCity : null,
+          departure_city: (departureTransport !== "none" || returnTransport !== "none") ? departureLocation?.name : null,
         },
         { withCredentials: true }
       );
@@ -277,45 +278,37 @@ const TripPlanner = () => {
             </div>
 
             <div className="bg-card border border-border rounded-xl p-4 sm:p-6 space-y-6 animate-slide-up">
-              {/* Destination and Departure City - Swapped Order */}
+              {/* Destination and Departure - With Autocomplete */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="departure-city">Departure City</Label>
-                  <div className="relative">
-                    <Plane className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="departure-city"
-                      placeholder="New York"
-                      value={departureCity}
-                      onChange={(e) => {
-                        setDepartureCity(e.target.value);
-                        if (errors.departureCity) setErrors({ ...errors, departureCity: null });
-                      }}
-                      className={`pl-10 h-12 ${errors.departureCity ? 'border-destructive' : ''}`}
-                      data-testid="departure-city-input"
-                    />
-                  </div>
-                  {errors.departureCity && (
-                    <p className="text-sm text-destructive">{errors.departureCity}</p>
+                  <Label htmlFor="departure-location">Departure</Label>
+                  <LocationAutocomplete
+                    value={departureLocation?.display_name || ""}
+                    onChange={(location) => {
+                      setDepartureLocation(location);
+                      if (errors.departureLocation) setErrors({ ...errors, departureLocation: null });
+                    }}
+                    placeholder="Select departure location"
+                    icon={Plane}
+                    error={!!errors.departureLocation}
+                  />
+                  {errors.departureLocation && (
+                    <p className="text-sm text-destructive">{errors.departureLocation}</p>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="destination">Destination</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="destination"
-                      placeholder="Paris, France"
-                      value={destination}
-                      onChange={(e) => {
-                        setDestination(e.target.value);
-                        if (errors.destination) setErrors({ ...errors, destination: null });
-                      }}
-                      className={`pl-10 h-12 ${errors.destination ? 'border-destructive' : ''}`}
-                      data-testid="destination-input"
-                    />
-                  </div>
+                  <LocationAutocomplete
+                    value={destination?.display_name || ""}
+                    onChange={(location) => {
+                      setDestination(location);
+                      if (errors.destination) setErrors({ ...errors, destination: null });
+                    }}
+                    placeholder="Select destination"
+                    icon={MapPin}
+                    error={!!errors.destination}
+                  />
                   {errors.destination && (
                     <p className="text-sm text-destructive">{errors.destination}</p>
                   )}
