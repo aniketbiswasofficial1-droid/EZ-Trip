@@ -59,7 +59,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { format } from "date-fns";
-import { PlanViewer } from "@/components/PlanViewer";
+import { EditablePlanViewer } from "@/components/EditablePlanViewer";
 
 const TripDetail = () => {
   const { tripId } = useParams();
@@ -1722,7 +1722,7 @@ const TripDetail = () => {
                     Unlink Plan
                   </Button>
                 </div>
-                <PlanViewer plan={linkedPlan} />
+                <EditablePlanViewer plan={linkedPlan} tripId={tripId} />
 
 
               </div>

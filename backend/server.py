@@ -1428,6 +1428,51 @@ async def get_settlements(
     
     return settlements
 
+@trips_router.put("/{trip_id}/plan")
+async def update_trip_plan(
+    trip_id: str,
+    plan_data: TripPlanResponse,
+    user: dict = Depends(get_current_user)
+):
+    """Update a trip's saved plan"""
+    # Verify trip exists and user is a member
+    trip = await db.trips.find_one(
+        {"trip_id": trip_id, "members.user_id": user["user_id"]},
+        {"_id": 0}
+    )
+    
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found or unauthorized")
+    
+    # Find existing plan for this trip
+    existing_plan = await db.user_plans.find_one(
+        {"linked_to_trip": trip_id},
+        {"_id": 0}
+    )
+    
+    # Update plan data
+    plan_dict = plan_data.model_dump()
+    plan_dict["updated_at"] = datetime.now(timezone.utc).isoformat()
+    plan_dict["is_edited"] = True  # Mark as user-edited
+    
+    if existing_plan:
+        # Update existing plan
+        await db.user_plans.update_one(
+            {"plan_id": existing_plan["plan_id"]},
+            {"$set": plan_dict}
+        )
+        return {"message": "Plan updated successfully", "plan_id": existing_plan["plan_id"]}
+    else:
+        # Create new plan linked to trip
+        plan_id = f"plan_{uuid.uuid4().hex[:12]}"
+        plan_dict["plan_id"] = plan_id
+        plan_dict["user_id"] = user["user_id"]
+        plan_dict["linked_to_trip"] = trip_id
+        plan_dict["created_at"] = datetime.now(timezone.utc).isoformat()
+        
+        await db.user_plans.insert_one(plan_dict)
+        return {"message": "Plan created successfully", "plan_id": plan_id}
+
 # ========================
 # EXPENSES ROUTES
 # ========================
