@@ -15,7 +15,7 @@ import uuid
 import re  # Required for password validation
 from datetime import datetime, timezone, timedelta
 import httpx
-from trip_planner import trip_planner, TripPlanRequest, TripPlanResponse
+from trip_planner import get_trip_planner, TripPlanRequest, TripPlanResponse
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from email_service import EmailService
@@ -1931,7 +1931,7 @@ async def generate_trip_plan(
 ):
     """Generate an AI-powered trip plan"""
     try:
-        plan = await trip_planner.generate_trip_plan(request, user["user_id"])
+        plan = await get_trip_planner().generate_trip_plan(request, user["user_id"])
         return plan
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -2532,7 +2532,7 @@ async def generate_trip_plan(
 ):
     """Generate a trip plan using AI"""
     try:
-        plan = await trip_planner.generate_trip_plan(request, user["user_id"])
+        plan = await get_trip_planner().generate_trip_plan(request, user["user_id"])
         return plan
     except Exception as e:
         logger.error(f"Trip generation error: {e}")

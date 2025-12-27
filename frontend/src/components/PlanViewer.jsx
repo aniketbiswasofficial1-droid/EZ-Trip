@@ -79,94 +79,11 @@ export const PlanViewer = ({ plan }) => {
                 </div>
             )}
 
-            {/* Transport Details */}
-            {(plan.departure_transport_details || plan.return_transport_details) && (
-                <div className="grid md:grid-cols-2 gap-4">
-                    {plan.departure_transport_details && (
-                        <div className="bg-card border border-border rounded-xl p-6">
-                            <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
-                                <Plane className="w-5 h-5 text-primary" />
-                                Departure Transport
-                            </h4>
-                            <div className="space-y-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Type</span>
-                                    <span className="font-medium capitalize">{plan.departure_transport_details.transport_type}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Cost</span>
-                                    <span className="font-medium text-primary">
-                                        {getCurrencySymbol(plan.cost_breakdown?.currency || "INR")}{plan.departure_transport_details.cost?.toLocaleString()}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Duration</span>
-                                    <span className="font-medium">{plan.departure_transport_details.duration}</span>
-                                </div>
-                                {plan.departure_transport_details.provider && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Provider</span>
-                                        <span className="font-medium">{plan.departure_transport_details.provider}</span>
-                                    </div>
-                                )}
-                                {(plan.departure_transport_details.departure_time || plan.departure_transport_details.arrival_time) && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Times</span>
-                                        <span className="font-medium text-sm">
-                                            {plan.departure_transport_details.departure_time} → {plan.departure_transport_details.arrival_time}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {plan.return_transport_details && (
-                        <div className="bg-card border border-border rounded-xl p-6">
-                            <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
-                                <Plane className="w-5 h-5 text-primary" />
-                                Return Transport
-                            </h4>
-                            <div className="space-y-3">
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Type</span>
-                                    <span className="font-medium capitalize">{plan.return_transport_details.transport_type}</span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Cost</span>
-                                    <span className="font-medium text-primary">
-                                        {getCurrencySymbol(plan.cost_breakdown?.currency || "INR")}{plan.return_transport_details.cost?.toLocaleString()}
-                                    </span>
-                                </div>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Duration</span>
-                                    <span className="font-medium">{plan.return_transport_details.duration}</span>
-                                </div>
-                                {plan.return_transport_details.provider && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Provider</span>
-                                        <span className="font-medium">{plan.return_transport_details.provider}</span>
-                                    </div>
-                                )}
-                                {(plan.return_transport_details.departure_time || plan.return_transport_details.arrival_time) && (
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Times</span>
-                                        <span className="font-medium text-sm">
-                                            {plan.return_transport_details.departure_time} → {plan.return_transport_details.arrival_time}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
             {/* Tabs for Details */}
             <Tabs defaultValue="itinerary" className="space-y-4">
                 <TabsList className="bg-secondary/50 p-1 rounded-full w-full grid grid-cols-6">
-                    <TabsTrigger value="prices" className="rounded-full text-xs sm:text-sm">
-                        Prices
+                    <TabsTrigger value="connectivity" className="rounded-full text-xs sm:text-sm">
+                        Routes
                     </TabsTrigger>
                     <TabsTrigger value="itinerary" className="rounded-full text-xs sm:text-sm">
                         Day Plan
@@ -184,6 +101,81 @@ export const PlanViewer = ({ plan }) => {
                         Info
                     </TabsTrigger>
                 </TabsList>
+
+                {/* Connectivity Tab */}
+                <TabsContent value="connectivity">
+                    <div className="space-y-4">
+                        <div className="bg-card border border-border rounded-xl p-6">
+                            <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
+                                🚆✈️ Transport Connectivity & Journey Times
+                            </h4>
+                            <p className="text-sm text-muted-foreground mb-6">
+                                Suggested routes and journey times for your trip
+                            </p>
+
+                            {plan.cost_breakdown?.connectivity_suggestions && plan.cost_breakdown.connectivity_suggestions.length > 0 ? (
+                                <div className="space-y-6">
+                                    {plan.cost_breakdown.connectivity_suggestions.map((conn, idx) => (
+                                        <div key={idx} className="p-5 bg-secondary/30 rounded-xl border border-border">
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div>
+                                                    <h5 className="font-bold text-lg capitalize flex items-center gap-2">
+                                                        {conn.transport_mode === 'flight' ? '✈️' : '🚆'} {conn.transport_mode}
+                                                    </h5>
+                                                    <p className="text-sm text-muted-foreground mt-1">
+                                                        {conn.from_location} → {conn.to_location}
+                                                    </p>
+                                                </div>
+                                                <div className={`px-3 py-1 rounded-full text-sm font-medium ${conn.has_direct_connectivity ? 'bg-green-500/20 text-green-700 dark:text-green-400' : 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400'}`}>
+                                                    {conn.has_direct_connectivity ? '✓ Direct' : '⚠ Via Nearest'}
+                                                </div>
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 gap-4 mb-4">
+                                                <div className="p-3 bg-background rounded-lg">
+                                                    <p className="text-xs text-muted-foreground mb-1">Journey Time</p>
+                                                    <p className="font-heading text-xl font-bold text-primary">⏱️ {conn.journey_time_estimate}</p>
+                                                </div>
+
+                                                {!conn.has_direct_connectivity && conn.nearest_station_airport && (
+                                                    <div className="p-3 bg-background rounded-lg">
+                                                        <p className="text-xs text-muted-foreground mb-1">Nearest Station/Airport</p>
+                                                        <p className="font-medium">{conn.nearest_station_airport}</p>
+                                                        {conn.distance_to_nearest_km && (
+                                                            <p className="text-xs text-muted-foreground mt-1">📍 ~{conn.distance_to_nearest_km} km away</p>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="p-3 bg-background rounded-lg mb-4">
+                                                <p className="text-sm text-muted-foreground mb-1">📋 Connectivity Notes</p>
+                                                <p className="text-sm">{conn.connectivity_notes}</p>
+                                            </div>
+
+                                            {conn.suggested_options && conn.suggested_options.length > 0 && (
+                                                <div>
+                                                    <p className="text-sm font-medium mb-2">Suggested Options:</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {conn.suggested_options.map((option, oidx) => (
+                                                            <span key={oidx} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm border border-primary/20">
+                                                                {option}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-muted-foreground text-center py-8">
+                                    No connectivity suggestions available
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                </TabsContent>
 
                 {/* Itinerary Tab */}
                 <TabsContent value="itinerary">
@@ -251,55 +243,6 @@ export const PlanViewer = ({ plan }) => {
                             ))}
                         </div>
                     </ScrollArea>
-                </TabsContent>
-
-                {/* Price Comparison Tab */}
-                <TabsContent value="prices">
-                    <div className="space-y-4">
-                        <div className="bg-card border border-border rounded-xl p-6">
-                            <h4 className="font-heading text-lg font-bold mb-4 flex items-center gap-2">
-                                <span className="text-xl">{getCurrencySymbol(plan.cost_breakdown?.currency || "INR")}</span>
-                                Price Comparison Across Platforms
-                            </h4>
-                            <p className="text-sm text-muted-foreground mb-6">
-                                Compare prices from multiple booking platforms to find the best deals
-                            </p>
-
-                            {plan.cost_breakdown?.price_comparisons && plan.cost_breakdown.price_comparisons.length > 0 ? (
-                                <div className="space-y-6">
-                                    {plan.cost_breakdown.price_comparisons.map((comparison, idx) => (
-                                        <div key={idx} className="border-b border-border pb-4 last:border-0">
-                                            <h5 className="font-semibold mb-3 capitalize">{comparison.item_name || comparison.category.replace(/_/g, ' ')}</h5>
-                                            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                {comparison.prices?.map((price, priceIdx) => (
-                                                    <a
-                                                        key={priceIdx}
-                                                        href={price.url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="block p-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors"
-                                                    >
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <span className="font-medium">{price.platform}</span>
-                                                            <span className="text-primary font-bold">
-                                                                {getCurrencySymbol(plan.cost_breakdown.currency)}
-                                                                {price.price?.toLocaleString()}
-                                                            </span>
-                                                        </div>
-                                                        {price.duration && (
-                                                            <p className="text-xs text-muted-foreground">{price.duration}</p>
-                                                        )}
-                                                    </a>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <p className="text-muted-foreground">No price comparisons available</p>
-                            )}
-                        </div>
-                    </div>
                 </TabsContent>
 
                 {/* Activities Tab */}

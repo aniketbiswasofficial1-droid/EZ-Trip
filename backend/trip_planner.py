@@ -1,6 +1,6 @@
 """
 AI Trip Planner Service
-Uses standard OpenAI API for AI-powered trip planning.
+Uses Google Gemini 1.5 Flash for AI-powered trip planning.
 """
 import os
 import httpx
@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import json
-from openai import AsyncOpenAI
+import google.generativeai as genai  # Using older but stable package
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -44,12 +44,17 @@ class TransportDetails(BaseModel):
     arrival_time: Optional[str] = None
     provider: Optional[str] = None
 
-class PriceComparison(BaseModel):
-    category: str
-    item_name: str
-    prices: List[Dict[str, Any]]  # Each price dict should have: platform, price, url (optional), duration
-    best_deal: Dict[str, Any]
-    savings_potential: float
+class ConnectivityInfo(BaseModel):
+    transport_mode: str  # "train" or "flight"
+    from_location: str
+    to_location: str
+    has_direct_connectivity: bool
+    journey_time_estimate: str  # e.g., "6h 30m"
+    connectivity_notes: str  # e.g., "Direct service available" or "Via nearest airport"
+    nearest_station_airport: Optional[str] = None  # Name of nearest station/airport if not direct
+    distance_to_nearest_km: Optional[float] = None  # Distance to nearest station/airport
+    suggested_options: List[str] = []  # e.g., ["Rajdhani Express", "Shatabdi Express"] or ["Multiple daily flights"]
+
 
 class ActivityCategory(BaseModel):
     category: str  # adventure, dining, cultural, relaxation, etc.
@@ -79,7 +84,7 @@ class CostBreakdown(BaseModel):
     total_per_person: float
     total_group: float
     currency: str
-    price_comparisons: List[PriceComparison] = []
+    connectivity_suggestions: List[ConnectivityInfo] = []
     activities_breakdown: List[ActivityCategory] = []
 
 class TripPlanResponse(BaseModel):
@@ -102,12 +107,44 @@ class TripPlanResponse(BaseModel):
 
 class TripPlannerService:
     def __init__(self):
-        # CHANGED: Use standard OPENAI_API_KEY
-        self.api_key = os.environ.get('OPENAI_API_KEY')
-        self.client = AsyncOpenAI(api_key=self.api_key)
+        # Configure Gemini API (using older stable package)
+        self.api_key = os.getenv("GOOGLE_API_KEY")
+        if not self.api_key:
+            raise ValueError("GOOGLE_API_KEY environment variable is not set")
+        genai.configure(api_key=self.api_key)
+        self.model = genai.GenerativeModel('gemini-2.5-flash-lite')  # Latest lite version
         self.weather_base_url = "https://api.open-meteo.com/v1"
         self.geocoding_url = "https://geocoding-api.open-meteo.com/v1"
         
+    def get_primary_airport(self, location: str) -> Optional[Dict[str, str]]:
+        """Map locations to their primary airport for flight searches"""
+        # Common Indian airports and international hubs
+        airport_mapping = {
+            "kolkata": {"code": "CCU", "name": "Netaji Subhas Chandra Bose International Airport", "city": "Kolkata"},
+            "karimpur": {"code": "CCU", "name": "Netaji Subhas Chandra Bose International Airport", "city": "Kolkata"},  # Near Kolkata
+            "goa": {"code": "GOI", "name": "Goa International Airport (Dabolim)", "city": "Goa"},
+            "south goa": {"code": "GOI", "name": "Goa International Airport (Dabolim)", "city": "Goa"},
+            "north goa": {"code": "GOI", "name": "Goa International Airport (Dabolim)", "city": "Goa"},
+            "delhi": {"code": "DEL", "name": "Indira Gandhi International Airport", "city": "Delhi"},
+            "new delhi": {"code": "DEL", "name": "Indira Gandhi International Airport", "city": "Delhi"},
+            "mumbai": {"code": "BOM", "name": "Chhatrapati Shivaji Maharaj International Airport", "city": "Mumbai"},
+            "bangalore": {"code": "BLR", "name": "Kempegowda International Airport", "city": "Bangalore"},
+            "bengaluru": {"code": "BLR", "name": "Kempegowda International Airport", "city": "Bangalore"},
+            "chennai": {"code": "MAA", "name": "Chennai International Airport", "city": "Chennai"},
+            "hyderabad": {"code": "HYD", "name": "Rajiv Gandhi International Airport", "city": "Hyderabad"},
+            "pune": {"code": "PNQ", "name": "Pune Airport", "city": "Pune"},
+            "ahmedabad": {"code": "AMD", "name": "Sardar Vallabhbhai Patel International Airport", "city": "Ahmedabad"},
+            "jaipur": {"code": "JAI", "name": "Jaipur International Airport", "city": "Jaipur"},
+            "kochi": {"code": "COK", "name": "Cochin International Airport", "city": "Kochi"},
+            "cochin": {"code": "COK", "name": "Cochin International Airport", "city": "Kochi"},
+        }
+        
+        location_lower = location.lower()
+        for city, airport in airport_mapping.items():
+            if city in location_lower:
+                return airport
+        return None
+    
     async def get_coordinates(self, location: str) -> Optional[Dict[str, float]]:
         """Get latitude and longitude for a location"""
         try:
@@ -197,91 +234,138 @@ class TripPlannerService:
             for w in weather_forecast:
                 weather_info += f"- {w.date}: {w.weather_description}, {w.temperature_min}°C - {w.temperature_max}°C, {w.precipitation_probability}% rain chance\n"
         
-        # Enhanced prompt with detailed requirements
-        system_prompt = """You are an expert travel planner AI with access to current pricing data from multiple booking platforms. You create detailed, practical trip itineraries with accurate cost estimates, price comparisons across platforms with travel durations, categorized packing lists, location-specific tips, and activity breakdowns.
+        # Get airport information for better flight routing
+        departure_airport = None
+        destination_airport = None
+        if request.departure_city:
+            departure_airport = self.get_primary_airport(request.departure_city)
+        destination_airport = self.get_primary_airport(request.destination)
         
-        Your response MUST be valid JSON matching the structure provided in the user prompt. Do not include markdown formatting like ```json."""
+        # Build airport context for AI
+        airport_context = ""
+        airport_proximity_info = ""
+        
+        if departure_airport and destination_airport:
+            airport_context = f"""\n✈️ FLIGHT ROUTING:
+- Departure Airport: {departure_airport['city']} ({departure_airport['code']}) - {departure_airport['name']}
+- Destination Airport: {destination_airport['city']} ({destination_airport['code']}) - {destination_airport['name']}
+"""
+            
+            # Check if departure location differs from airport city
+            departure_location_lower = request.departure_city.lower() if request.departure_city else ""
+            destination_location_lower = request.destination.lower()
+            
+            uses_nearby_departure = departure_airport and departure_airport['city'].lower() not in departure_location_lower
+            uses_nearby_destination = destination_airport and destination_airport['city'].lower() not in destination_location_lower
+            
+            if uses_nearby_departure or uses_nearby_destination:
+                airport_proximity_info = "\n🏢 AIRPORT PROXIMITY NOTIFICATION (IMPORTANT):\n"
+                if uses_nearby_departure:
+                    airport_proximity_info += f"- User's departure location '{request.departure_city}' does NOT have a direct airport.\n"
+                    airport_proximity_info += f"  NEAREST AIRPORT: {departure_airport['name']} ({departure_airport['code']}) in {departure_airport['city']}\n"
+                    airport_proximity_info += f"  YOU MUST inform the user: 'Nearest airport to {request.departure_city} is {departure_airport['name']} ({departure_airport['code']}) in {departure_airport['city']}'\n"
+                if uses_nearby_destination:
+                    airport_proximity_info += f"- User's destination '{request.destination}' does NOT have a direct airport.\n"
+                    airport_proximity_info += f"  NEAREST AIRPORT: {destination_airport['name']} ({destination_airport['code']}) in {destination_airport['city']}\n"
+                    airport_proximity_info += f"  YOU MUST inform the user: 'Nearest airport to {request.destination} is {destination_airport['name']} ({destination_airport['code']}) in {destination_airport['city']}'\n"
 
-        user_prompt = f"""Plan a detailed trip with the following details:
+        
+        # Known direct flight routes (major Indian routes)
+        known_direct_routes = {
+            ("CCU", "GOI"): {"duration": "2h 30m", "note": "Multiple daily direct flights available (IndiGo, Air India, SpiceJet)"},
+            ("GOI", "CCU"): {"duration": "2h 30m", "note": "Multiple daily direct flights available (IndiGo, Air India, SpiceJet)"},
+            ("DEL", "GOI"): {"duration": "2h 45m", "note": "Frequent direct flights (IndiGo, Air India, SpiceJet, Vistara)"},
+            ("GOI", "DEL"): {"duration": "2h 45m", "note": "Frequent direct flights (IndiGo, Air India, SpiceJet, Vistara)"},
+            ("BOM", "GOI"): {"duration": "1h 15m", "note": "Multiple daily direct flights (IndiGo, Air India, SpiceJet)"},
+            ("GOI", "BOM"): {"duration": "1h 15m", "note": "Multiple daily direct flights (IndiGo, Air India, SpiceJet)"},
+            ("BLR", "GOI"): {"duration": "1h 30m", "note": "Direct flights available (IndiGo, Air India)"},
+            ("GOI", "BLR"): {"duration": "1h 30m", "note": "Direct flights available (IndiGo, Air India)"},
+        }
+        
+        # Check if there's a known direct route
+        direct_route_info = ""
+        if departure_airport and destination_airport:
+            route_key = (departure_airport['code'], destination_airport['code'])
+            if route_key in known_direct_routes:
+                route = known_direct_routes[route_key]
+                direct_route_info = f"""\n🎯 VERIFIED DIRECT ROUTE:
+- Route: {departure_airport['code']} → {destination_airport['code']}
+- Flight Duration: {route['duration']}
+- Availability: {route['note']}
+- IMPORTANT: This is a DIRECT FLIGHT route. Do NOT suggest layovers unless specifically needed.
+"""
+        
+        # Optimized system prompt with STRONG anti-hallucination
+        system_prompt = f"""Expert travel planner. Generate valid JSON (no markdown).
 
-**Destination:** {location_info}
-**Dates:** {request.start_date} to {request.end_date} ({num_days} days)
-**Number of travelers:** {request.num_travelers}
-**Budget preference:** {request.budget_preference}
-**Interests:** {', '.join(request.interests) if request.interests else 'General sightseeing'}
-**Accommodation type:** {request.accommodation_type}
-**Departure transport:** {request.departure_transport.capitalize() if request.departure_transport != 'none' else 'None'} from {request.departure_city if request.departure_city else 'departure city'}
-**Return transport:** {request.return_transport.capitalize() if request.return_transport != 'none' else 'None'} to {request.departure_city if request.departure_city else 'departure city'}
-**Currency:** {request.currency}
+CRITICAL LOCATION RULES:
+- The destination is: {location_info}
+- Use this EXACT name in ALL outputs
+- If destination contains "Goa" → It is GOA, INDIA (NOT Genoa)
+- VERIFY every location reference matches: {location_info}
+
+FLIGHT SEARCH RULES:
+- For flight searches, use the NEAREST MAJOR AIRPORT to the departure/destination city
+- Example: Karimpur-I is near Kolkata, so use Kolkata (CCU) airport
+- STRONGLY PREFER direct flights over connecting flights
+- Only suggest layovers if NO direct flights exist OR if significantly cheaper (>40% savings)
+- Major Indian airports have excellent domestic connectivity{airport_context}{direct_route_info}
+
+TRAIN CONNECTIVITY:
+- ALWAYS provide train connectivity information in addition to flight options
+- Include train routes even when flights are available - travelers may prefer trains for scenic routes or budget
+- For each route, suggest both flight AND train options in connectivity_suggestions
+- Common trains: Rajdhani (fastest), Shatabdi (day travel), Express trains (budget-friendly)
+
+NEAREST AIRPORT COMMUNICATION:
+- When user's location differs from airport city, inform them CLEARLY in connectivity_notes
+- Example: "Nearest airport to Karimpur-I is Netaji Subhas Chandra Bose International Airport (CCU) in Kolkata"
+- Include this information for BOTH departure and destination if applicable{airport_proximity_info}"""
+
+        # Optimized user prompt - concise and focused
+        flight_instruction = ""
+        if departure_airport and destination_airport:
+            if (departure_airport['code'], destination_airport['code']) in known_direct_routes:
+                flight_instruction = f"""\n⚠️ CRITICAL FLIGHT INSTRUCTION:
+There ARE direct flights from {departure_airport['city']} ({departure_airport['code']}) to {destination_airport['city']} ({destination_airport['code']}).
+Flight duration: ~{known_direct_routes[(departure_airport['code'], destination_airport['code'])]['duration']}
+DO NOT suggest layovers or connecting flights for this route - PREFER THE DIRECT FLIGHT.
+Set has_direct_connectivity=true for this route.
+
+🚂 TRAIN OPTION:
+ALSO provide train connectivity information as an alternative option.
+Include both flight (direct, preferred) AND train options in connectivity_suggestions array.
+"""
+        
+        user_prompt = f"""⚠️ DESTINATION VERIFICATION:
+The user's destination is: {location_info}
+CONFIRM: All connectivity, flights, and journey information MUST be for {location_info}
+If this is "Goa, India" → Use GOI airport code (Goa International Airport - Dabolim)
+If this is "Goa, India" → NEVER mention Genoa, Italy or GOA (Genoa) airport{flight_instruction}
+
+TRIP DETAILS:
+From: {request.departure_city or 'departure city'}
+To: {location_info}
+
+Dates: {request.start_date} to {request.end_date} ({num_days} days)
+Travelers: {request.num_travelers} | Budget: {request.budget_preference}
+Interests: {', '.join(request.interests) if request.interests else 'General'}
+Accommodation: {request.accommodation_type}
+Transport: {request.departure_transport}/{request.return_transport}
+Currency: {request.currency}
 
 {weather_info}
 
-CRITICAL REQUIREMENTS:
-
-1. **Transport with Price Comparison & Duration:**
-   - For departure and return transport, provide price comparisons from multiple platforms (e.g., MakeMyTrip, Goibibo, Booking.com, Cleartrip, IRCTC for trains)
-   - EACH price entry MUST include travel duration/time (e.g., "2h 30m", "5h 15m")
-   - Include at least 3-4 platform options for each transport type
-   - Mark the best deal clearly
-
-2. **Intercity Local Transportation:**
-   - Include costs for local transport BETWEEN cities during the trip (not within a city)
-   - This is for traveling between different destinations during the itinerary
-   - Include this in the local_transportation cost breakdown
-
-3. **Activities Breakdown by Category:**
-   - Categorize all activities into: adventure, dining, cultural, relaxation, nature, shopping, nightlife, photography
-   - Provide total cost estimate for each category
-   - List specific activities planned under each category
-
-4. **Categorized Packing Suggestions:**
-   - Organize packing items into clear categories:
-     * essentials (sunscreen, first aid, medications, toiletries)
-     * clothing (weather-appropriate, activity-specific)
-     * electronics (camera, chargers, adapters, power bank)
-     * documents (passport, tickets, hotel bookings, ID)
-     * accessories (sunglasses, hat, backpack, water bottle)
-   - Provide 5-8 items per category, specific to destination and weather
-
-5. **Location-Specific Travel Tips:**
-   - Provide tips SPECIFIC to {location_info}
-   - Include local customs and etiquette specific to this destination
-   - Add safety tips relevant to this location
-   - Include best practices for this specific region
-
-6. **Daily Itinerary - CRITICAL:**
-   - YOU MUST CREATE ITINERARY FOR ALL {num_days} DAYS
-   - DO NOT skip any days - plan activities from Day 1 through Day {num_days}
-   - For EACH day, include breakfast, lunch, and dinner with realistic timing and costs
-   - Include appropriate rest/downtime periods
-   - Ensure all activities have proper time allocations
-   - **Include dress code or special requirements** for activities when applicable (e.g., "Dress code: Shoes and formal attire required" for casinos, "Modest dress required" for religious sites)
-   - Add these requirements in the activity description field
-
-7. **Booking Platform URLs - CRITICAL FOR USER EXPERIENCE:**
-   - **ALL URLs MUST BE PRE-FILLED** with trip details (dates, origin, destination, travelers)
-   - Users should only need to CLICK THE LINK and then confirm/book
-   - DO NOT provide generic homepage URLs - they must have query parameters
-   
-   **Flight URL Formats** (use appropriate format for each platform):
-   - Skyscanner: Use format like "https://www.skyscanner.co.in/transport/flights/{{origin_airport_code}}/{{destination_airport_code}}/{{departure_date_YYMMDD}}/{{return_date_YYMMDD}}/?adults={{num_travelers}}"
-   - MakeMyTrip: Include origin, destination, dates, travelers in URL parameters
-   - Goibibo: Include flight search parameters with dates and travelers
-   - Cleartrip: Pre-fill from, to, dates, adults parameters
-   - Google Flights: Use search URL with origin, destination, dates
-   - Expedia: Include search criteria in URL
-   
-   **Train URL Formats** (for India):
-   - Cleartrip Trains: "https://www.cleartrip.com/trains/{{origin_station}}/{{destination_station}}/{{date}}" with travelers
-   - MakeMyTrip Railways: Include origin station, destination station, date, passenger count
-   - IRCTC: "https://www.irctc.co.in/" (requires login, so just provide main URL with note)
-   
-   **IMPORTANT**: 
-   - Use airport codes (DEL for Delhi, GOI for Goa, BOM for Mumbai, etc.)
-   - Use station codes for trains (NDLS for New Delhi, VSG for Vasco Da Gama, etc.)
-   - Format dates as required by each platform (usually YYMMDD or YYYY-MM-DD)
-   - Include number of travelers/adults parameter
-   - For return journeys, include both departure and return dates
+REQUIREMENTS:
+1. Transport: 
+   - PREFER direct flights when available (faster, more convenient)
+   - Find nearest airport/station to each city → calc journey time → suggest options
+   - Provide BOTH flight AND train connectivity suggestions for each route
+   - Only suggest connecting flights if no direct option exists
+2. Itinerary: Day-by-day detailed plan with activities, times, costs
+3. Packing: Categorize by essentials/clothing/electronics/documents
+4. Tips: Local customs, safety, budgeting advice
+5. Itinerary: MUST have ALL {num_days} days with breakfast/lunch/dinner, costs, timing
 
 Please provide a JSON response with this EXACT structure:
 {{
@@ -291,17 +375,17 @@ Please provide a JSON response with this EXACT structure:
         "transport_type": "{request.departure_transport}",
         "cost": 0,
         "duration": "Xh XXm",
-        "departure_time": "HH:MM",
-        "arrival_time": "HH:MM",
-        "provider": "Best provider name"
+        "departure_time": null,
+        "arrival_time": null,
+        "provider": null
     }},
     "return_transport": {{
         "transport_type": "{request.return_transport}",
         "cost": 0,
         "duration": "Xh XXm",
-        "departure_time": "HH:MM",
-        "arrival_time": "HH:MM",
-        "provider": "Best provider name"
+        "departure_time": null,
+        "arrival_time": null,
+        "provider": null
     }},
     "itinerary": [
         {{
@@ -325,32 +409,28 @@ Please provide a JSON response with this EXACT structure:
         "total_per_person": 0,
         "total_group": 0,
         "currency": "{request.currency}",
-        "price_comparisons": [
+        "connectivity_suggestions": [
             {{
-                "category": "departure_transport",
-                "item_name": "{request.departure_transport.capitalize()} from {{departure_city}} to {{destination}}",
-                "prices": [
-                    {{"platform": "Skyscanner", "price": 5200, "duration": "2h 30m", "url": "https://www.skyscanner.co.in/transport/flights/del/goi/250101/250108/?adults=2"}},
-                    {{"platform": "MakeMyTrip", "price": 5000, "duration": "2h 30m", "url": "https://www.makemytrip.com/flight/search?tripType=O&itinerary=DEL-GOI-01/01/2025&paxType=A-2"}},
-                    {{"platform": "Goibibo", "price": 4800, "duration": "2h 30m", "url": "https://www.goibibo.com/flights/air-DEL-GOI-20250101-2-0-0-E/"}},
-                    {{"platform": "Cleartrip", "price": 4900, "duration": "2h 30m", "url": "https://www.cleartrip.com/flight-booking/search?from=DEL&to=GOI&depart_date=01-01-2025&adults=2"}},
-                    {{"platform": "Google Flights", "price": 4850, "duration": "2h 30m", "url": "https://www.google.com/travel/flights?q=Flights%20from%20DEL%20to%20GOI%20on%202025-01-01%20for%202%20adults"}},
-                    {{"platform": "Expedia", "price": 5100, "duration": "2h 30m", "url": "https://www.expedia.co.in/Flights-Search?leg1=from:DEL,to:GOI,departure:01/01/2025&passengers=adults:2"}}
-                ],
-                "best_deal": {{"platform": "Goibibo", "price": 4800}},
-                "savings_potential": 400
+                "transport_mode": "{request.departure_transport}",
+                "from_location": "{request.departure_city}",
+                "to_location": "{location_info}",
+                "has_direct_connectivity": true,
+                "journey_time_estimate": "6h 30m",
+                "connectivity_notes": "Direct train service available from New Delhi Railway Station to Goa",
+                "nearest_station_airport": None,
+                "distance_to_nearest_km": None,
+                "suggested_options": ["Rajdhani Express", "Express trains", "Typical journey: 24-30 hours"]
             }},
             {{
-                "category": "return_transport",
-                "item_name": "{request.return_transport.capitalize()} from {{destination}} to {{departure_city}}",
-                "prices": [
-                    {{"platform": "Skyscanner", "price": 5400, "duration": "2h 30m", "url": "https://www.skyscanner.co.in/transport/flights/goi/del/250108/?adults=2"}},
-                    {{"platform": "MakeMyTrip", "price": 5200, "duration": "2h 30m", "url": "https://www.makemytrip.com/flight/search?tripType=O&itinerary=GOI-DEL-08/01/2025&paxType=A-2"}},
-                    {{"platform": "Goibibo", "price": 4900, "duration": "2h 30m", "url": "https://www.goibibo.com/flights/air-GOI-DEL-20250108-2-0-0-E/"}},
-                    {{"platform": "Cleartrip", "price": 5000, "duration": "2h 30m", "url": "https://www.cleartrip.com/flight-booking/search?from=GOI&to=DEL&depart_date=08-01-2025&adults=2"}}
-                ],
-                "best_deal": {{"platform": "Goibibo", "price": 4900}},
-                "savings_potential": 500
+                "transport_mode": "{request.return_transport}",
+                "from_location": "{location_info}",
+                "to_location": "{request.departure_city}",
+                "has_direct_connectivity": false,
+                "journey_time_estimate": "3h 45m total (30min local + 2h 30m flight + 45min local)",
+                "connectivity_notes": "Via nearest airport in Dabolim, Goa",
+                "nearest_station_airport": "Dabolim Airport (GOI)",
+                "distance_to_nearest_km": 25.0,
+                "suggested_options": ["Multiple daily flights", "2-3 hour flight duration", "IndiGo, Air India, SpiceJet available"]
             }}
         ],
         "activities_breakdown": [
@@ -388,21 +468,22 @@ Please provide a JSON response with this EXACT structure:
     }}
 }}"""
 
-        # CHANGED: Standard OpenAI Call
+
+        # Gemini API Call (using older stable package)
         try:
-            response = await self.client.chat.completions.create(
-                model="gpt-4o",  # or gpt-3.5-turbo
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                response_format={"type": "json_object"}
+            # Combine prompts
+            full_prompt = f"{system_prompt}\n\n{user_prompt}"
+            
+            # Call Gemini with JSON mode
+            response = await self.model.generate_content_async(
+                full_prompt,
+                generation_config=genai.GenerationConfig(
+                    response_mime_type="application/json"
+                )
             )
             
-            content = response.choices[0].message.content
+            content = response.text
             ai_plan = json.loads(content)
-            
-            # ... (Rest of parsing logic remains identical to original file) ...
             
             # Parse transport details
             departure_transport_data = ai_plan.get("departure_transport", {})
@@ -452,14 +533,18 @@ Please provide a JSON response with this EXACT structure:
                 ))
             
             cost_data = ai_plan.get("cost_breakdown", {})
-            price_comparisons = []
-            for pc in cost_data.get("price_comparisons", []):
-                price_comparisons.append(PriceComparison(
-                    category=pc.get("category", ""),
-                    item_name=pc.get("item_name", ""),
-                    prices=pc.get("prices", []),
-                    best_deal=pc.get("best_deal", {}),
-                    savings_potential=pc.get("savings_potential", 0)
+            connectivity_suggestions = []
+            for cs in cost_data.get("connectivity_suggestions", []):
+                connectivity_suggestions.append(ConnectivityInfo(
+                    transport_mode=cs.get("transport_mode", ""),
+                    from_location=cs.get("from_location", ""),
+                    to_location=cs.get("to_location", ""),
+                    has_direct_connectivity=cs.get("has_direct_connectivity", False),
+                    journey_time_estimate=cs.get("journey_time_estimate", ""),
+                    connectivity_notes=cs.get("connectivity_notes", ""),
+                    nearest_station_airport=cs.get("nearest_station_airport"),
+                    distance_to_nearest_km=cs.get("distance_to_nearest_km"),
+                    suggested_options=cs.get("suggested_options", [])
                 ))
             
             # Parse activities breakdown
@@ -482,7 +567,7 @@ Please provide a JSON response with this EXACT structure:
                 total_per_person=cost_data.get("total_per_person", 0),
                 total_group=cost_data.get("total_group", 0),
                 currency=cost_data.get("currency", "USD"),
-                price_comparisons=price_comparisons,
+                connectivity_suggestions=connectivity_suggestions,
                 activities_breakdown=activities_breakdown
             )
             
@@ -514,7 +599,17 @@ Please provide a JSON response with this EXACT structure:
             )
             
         except Exception as e:
-            logger.error(f"Trip planning error: {e}", exc_info=True)
-            raise ValueError("Failed to generate trip plan. Please try again.")
+            logger.error(f"Trip planning error: {str(e)}", exc_info=True)
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error details: {repr(e)}")
+            raise ValueError(f"Failed to generate trip plan: {str(e)}")
 
-trip_planner = TripPlannerService()
+
+# Lazy initialization - will be created when first accessed (after .env is loaded)
+trip_planner = None
+
+def get_trip_planner():
+    global trip_planner
+    if trip_planner is None:
+        trip_planner = TripPlannerService()
+    return trip_planner
