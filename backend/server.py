@@ -2023,7 +2023,7 @@ async def update_llm_key(
     )
     
     # Update environment variable for current session
-    os.environ['EMERGENT_LLM_KEY'] = key_update.key
+    os.environ['OPENAI_API_KEY'] = key_update.key
     
     return {"message": "LLM key updated successfully"}
 
@@ -2355,7 +2355,7 @@ async def update_app_settings(
     
     # Update LLM key in environment if provided
     if "llm_key" in settings and settings["llm_key"]:
-        os.environ['EMERGENT_LLM_KEY'] = settings["llm_key"]
+        os.environ['OPENAI_API_KEY'] = settings["llm_key"]
     
     return {"message": "Settings updated"}
 

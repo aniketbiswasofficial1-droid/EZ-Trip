@@ -1,6 +1,6 @@
 """
-AI Trip Planner Service - STANDARD OPENAI VERSION
-Uses standard OpenAI API instead of Emergent wrapper.
+AI Trip Planner Service
+Uses standard OpenAI API for AI-powered trip planning.
 """
 import os
 import httpx
@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import json
-from openai import AsyncOpenAI  # Changed from emergentintegrations
+from openai import AsyncOpenAI
 
 # Configure logger
 logger = logging.getLogger(__name__)

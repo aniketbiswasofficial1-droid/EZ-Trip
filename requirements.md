@@ -4,7 +4,7 @@
 Create a responsive web-application which is a alternative to Splitwise, where a trip expense is easily calculated. If one or multiple person pays for the whole group or some specific people for a specific expense, can be added. It can also take into account of refunds of a specific bill and can distribute accordingly. It should have Gmail login and people can access it by logging in from their Gmail or account. It should have modern design. If it scales, I should easily be able to integrate ads in it.
 
 ## User Requirements
-- Emergent-managed Google Auth (privacy-focused)
+- Google OAuth authentication
 - Refunds option on each bill with clear indication
 - Multiple currency support (13+ currencies)
 - Native ad slots that blend with design
@@ -22,7 +22,7 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - **Currencies**: List of 13 supported currencies
 
 ### AI Trip Planner Service
-- **LLM**: OpenAI GPT-4o via Emergent LLM Key
+- **LLM**: OpenAI GPT-4o
 - **Weather API**: Open-Meteo (free, no API key needed)
 - **Features**:
   - Day-by-day itinerary with time slots
@@ -49,7 +49,7 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - `settings`: App settings including LLM API key
 
 ## Completed Features
-- [x] Google OAuth authentication (Emergent-managed)
+- [x] Google OAuth authentication
 - [x] Create/delete trips with cover images
 - [x] Add/remove trip members
 - [x] Multi-currency support (13 currencies)
@@ -85,7 +85,7 @@ Create a responsive web-application which is a alternative to Splitwise, where a
 - Frontend: React 19, Tailwind CSS, Shadcn/UI, Framer Motion
 - Backend: FastAPI, Motor (async MongoDB)
 - Database: MongoDB
-- Auth: Emergent-managed Google OAuth
-- AI: OpenAI GPT-4o via Emergent LLM Key
+- Auth: Google OAuth
+- AI: OpenAI GPT-4o
 - Weather: Open-Meteo API
 - Fonts: Montserrat

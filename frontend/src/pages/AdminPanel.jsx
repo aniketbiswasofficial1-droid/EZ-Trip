@@ -54,11 +54,11 @@ import {
 const AdminPanel = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+
   // Data states
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
@@ -66,7 +66,7 @@ const AdminPanel = () => {
   const [features, setFeatures] = useState([]);
   const [content, setContent] = useState([]);
   const [settings, setSettings] = useState(null);
-  
+
   // Pagination
   const [userPage, setUserPage] = useState(0);
   const [tripPage, setTripPage] = useState(0);
@@ -83,7 +83,7 @@ const AdminPanel = () => {
       const response = await axios.get(`${API}/admin/check`, {
         withCredentials: true,
       });
-      
+
       if (response.data.is_admin) {
         setIsAdmin(true);
         await loadAllData();
@@ -229,7 +229,7 @@ const AdminPanel = () => {
         params: { enabled },
         withCredentials: true,
       });
-      setFeatures(features.map(f => 
+      setFeatures(features.map(f =>
         f.feature_id === featureId ? { ...f, enabled } : f
       ));
       toast.success("Feature updated");
@@ -245,7 +245,7 @@ const AdminPanel = () => {
         params: { value },
         withCredentials: true,
       });
-      setContent(content.map(c => 
+      setContent(content.map(c =>
         c.content_id === contentId ? { ...c, value } : c
       ));
       toast.success("Content updated");
@@ -731,12 +731,12 @@ const AdminPanel = () => {
                       <Label>LLM API Key</Label>
                       <Input
                         type="password"
-                        placeholder="Enter API key or leave empty for Emergent key"
+                        placeholder="Enter your OpenAI API key"
                         value={settings.llm_key || ""}
                         onChange={(e) => setSettings({ ...settings, llm_key: e.target.value })}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Leave empty to use Emergent Universal Key
+                        Required for AI trip planning features
                       </p>
                     </div>
                   </div>
