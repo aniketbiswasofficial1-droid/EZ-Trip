@@ -482,7 +482,7 @@ async def register(user_data: UserRegister, response: Response):
             max_age=7 * 24 * 60 * 60
         )
         
-        return {"user_id": user_id, "name": new_user["name"], "email": new_user["email"]}
+        return {"user_id": user_id, "name": new_user["name"], "email": new_user["email"], "username": new_user["username"], "picture": new_user.get("picture")}
     except Exception as e:
         logger.error(f"Registration error: {e}")
         if isinstance(e, HTTPException):
@@ -519,7 +519,7 @@ async def login(login_data: UserLogin, response: Response):
         max_age=7 * 24 * 60 * 60
     )
     
-    return {"user_id": user["user_id"], "name": user["name"], "email": user["email"]}
+    return {"user_id": user["user_id"], "name": user["name"], "email": user["email"], "username": user.get("username"), "picture": user.get("picture")}
 
 @auth_router.get("/me")
 async def get_me(user: dict = Depends(get_current_user)):
@@ -750,7 +750,9 @@ async def google_auth(auth_data: GoogleAuthRequest, response: Response):
             max_age=7 * 24 * 60 * 60
         )
         
-        return {"user_id": user_id, "name": name, "email": email, "picture": picture}
+        # Get the updated user with username
+        updated_user = await db.users.find_one({"user_id": user_id}, {"_id": 0})
+        return {"user_id": user_id, "name": name, "email": email, "username": updated_user.get("username"), "picture": picture}
         
     except ValueError as e:
         logger.error(f"Google OAuth error: {str(e)}")

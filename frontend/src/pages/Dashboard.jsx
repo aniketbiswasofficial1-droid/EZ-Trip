@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth, API } from "@/App";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -72,6 +72,8 @@ const Dashboard = () => {
 
   // NEW: Username setup modal state
   const [showUsernameSetup, setShowUsernameSetup] = useState(false);
+  // NEW: Track if modal has been checked already in this session
+  const usernameModalChecked = useRef(false);
 
   useEffect(() => {
     fetchTrips();
@@ -79,11 +81,14 @@ const Dashboard = () => {
     checkAdminStatus();
     fetchSavedPlans();
 
-    // NEW: Check if user needs to set username
-    const skipped = sessionStorage.getItem("username_setup_skipped");
-    if (user && !user.username && !skipped) {
-      // Delay showing modal to avoid jarring experience
-      setTimeout(() => setShowUsernameSetup(true), 1000);
+    // NEW: Check if user needs to set username (only once per session)
+    if (!usernameModalChecked.current && user) {
+      usernameModalChecked.current = true;
+      const skipped = sessionStorage.getItem("username_setup_skipped");
+      if (!user.username && !skipped) {
+        // Delay showing modal to avoid jarring experience
+        setTimeout(() => setShowUsernameSetup(true), 1000);
+      }
     }
   }, [user]);
 
